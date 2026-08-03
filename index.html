@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Pocket Budget">
+  <title>Pocket Budget</title>
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+
+  <script src="db.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">PERSONAL FINANCE</p>
+        <h1>Pocket Budget</h1>
+      </div>
+      <div class="topbar-actions">
+        <label class="month-label" for="monthPicker">Month</label>
+        <input id="monthPicker" class="month-picker" type="month">
+      </div>
+    </header>
+
+    <div class="engine-status" id="engineStatus">Starting local database...</div>
+
+    <main>
+      <section id="homeView" class="view active" aria-label="Home dashboard">
+        <div id="setupNotice" class="notice hidden">
+          <strong>Set up this month first.</strong>
+          <span>Add your salary and saving target in Monthly Setup.</span>
+          <button type="button" data-go-view="settings">Open setup</button>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card income-card">
+            <span>Total income</span>
+            <strong id="totalIncome">RM 0.00</strong>
+            <small>Salary plus other income</small>
+          </article>
+          <article class="summary-card expense-card">
+            <span>Expenses</span>
+            <strong id="totalExpenses">RM 0.00</strong>
+            <small>Spent this month</small>
+          </article>
+          <article class="summary-card saving-card">
+            <span>Saved</span>
+            <strong id="totalSavings">RM 0.00</strong>
+            <small>Actual saving entries</small>
+          </article>
+          <article class="summary-card balance-card">
+            <span>Available</span>
+            <strong id="availableBalance">RM 0.00</strong>
+            <small>Income minus expenses and savings</small>
+          </article>
+        </div>
+
+        <section class="panel saving-panel">
+          <div class="panel-heading compact">
+            <div>
+              <p class="section-kicker">SAVING TARGET</p>
+              <h2 id="savingTargetText">RM 0.00 of RM 0.00</h2>
+            </div>
+            <strong id="savingPercent">0%</strong>
+          </div>
+          <div class="progress-track" aria-label="Saving target progress">
+            <div id="savingProgress" class="progress-fill"></div>
+          </div>
+        </section>
+
+        <div class="insight-grid">
+          <article class="mini-card">
+            <span>Savings rate</span>
+            <strong id="savingsRate">0%</strong>
+          </article>
+          <article class="mini-card">
+            <span>Top category</span>
+            <strong id="topCategory">-</strong>
+          </article>
+          <article class="mini-card">
+            <span>Daily spending</span>
+            <strong id="averageDaily">RM 0.00</strong>
+          </article>
+        </div>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">MONTHLY REPORT</p>
+              <h2>Expenses by category</h2>
+            </div>
+          </div>
+          <div class="chart-layout">
+            <div class="donut-wrap">
+              <canvas id="categoryChart" width="260" height="260" aria-label="Expense category doughnut chart"></canvas>
+              <div class="donut-center">
+                <small>Total</small>
+                <strong id="chartTotal">RM 0</strong>
+              </div>
+            </div>
+            <div id="chartLegend" class="chart-legend"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">SPENDING BREAKDOWN</p>
+              <h2>Highest expense categories</h2>
+            </div>
+          </div>
+          <div id="categoryBars" class="category-bars"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">LATEST ACTIVITY</p>
+              <h2>Recent transactions</h2>
+            </div>
+            <button class="text-button" type="button" data-go-view="transactions">View all</button>
+          </div>
+          <div id="recentTransactions" class="transaction-list"></div>
+        </section>
+      </section>
+
+      <section id="transactionsView" class="view" aria-label="Transactions">
+        <div class="page-heading">
+          <div>
+            <p class="section-kicker">HISTORY</p>
+            <h2>Transactions</h2>
+          </div>
+          <span id="transactionCount" class="count-badge">0 records</span>
+        </div>
+
+        <div class="filter-row">
+          <input id="transactionSearch" type="search" placeholder="Search notes or category">
+          <select id="transactionTypeFilter">
+            <option value="all">All types</option>
+            <option value="expense">Expenses</option>
+            <option value="income">Income</option>
+            <option value="saving">Savings</option>
+          </select>
+        </div>
+
+        <div id="allTransactions" class="transaction-list full-list"></div>
+      </section>
+
+      <section id="addView" class="view" aria-label="Add transaction">
+        <div class="page-heading">
+          <div>
+            <p class="section-kicker">NEW RECORD</p>
+            <h2 id="transactionFormTitle">Add transaction</h2>
+          </div>
+        </div>
+
+        <form id="transactionForm" class="panel form-panel">
+          <input id="editingId" type="hidden">
+
+          <div class="type-switch" role="group" aria-label="Transaction type">
+            <button class="type-button active" type="button" data-type="expense">Expense</button>
+            <button class="type-button" type="button" data-type="income">Income</button>
+            <button class="type-button" type="button" data-type="saving">Saving</button>
+          </div>
+          <input id="transactionType" type="hidden" value="expense">
+
+          <label class="field amount-field">
+            <span>Amount</span>
+            <div class="amount-input-wrap">
+              <span>RM</span>
+              <input id="transactionAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required>
+            </div>
+          </label>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Date</span>
+              <input id="transactionDate" type="date" required>
+            </label>
+            <label class="field">
+              <span>Category</span>
+              <select id="transactionCategory" required></select>
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Note</span>
+            <input id="transactionNote" type="text" maxlength="120" placeholder="Example: Weekly groceries">
+          </label>
+
+          <div class="form-actions">
+            <button id="cancelEditButton" class="secondary-button hidden" type="button">Cancel edit</button>
+            <button class="primary-button" type="submit">Save transaction</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="settingsView" class="view" aria-label="Settings">
+        <div class="page-heading">
+          <div>
+            <p class="section-kicker">SETTINGS</p>
+            <h2>Monthly setup</h2>
+          </div>
+        </div>
+
+        <form id="monthSetupForm" class="panel form-panel">
+          <p class="form-help">These values apply to <strong id="setupMonthName">this month</strong>.</p>
+          <label class="field">
+            <span>Monthly salary</span>
+            <div class="amount-input-wrap small">
+              <span>RM</span>
+              <input id="monthlySalary" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+            </div>
+          </label>
+          <label class="field">
+            <span>Saving target</span>
+            <div class="amount-input-wrap small">
+              <span>RM</span>
+              <input id="monthlySavingTarget" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00">
+            </div>
+          </label>
+          <button class="primary-button" type="submit">Save monthly setup</button>
+        </form>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">CUSTOMISE</p>
+              <h2>Categories</h2>
+            </div>
+          </div>
+          <form id="categoryForm" class="inline-form">
+            <select id="newCategoryType">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+              <option value="saving">Saving</option>
+            </select>
+            <input id="newCategoryName" type="text" maxlength="40" placeholder="New category" required>
+            <button class="primary-button compact-button" type="submit">Add</button>
+          </form>
+          <div id="categoryList" class="category-list"></div>
+        </section>
+
+        <section class="panel danger-zone">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">TESTING TOOLS</p>
+              <h2>Local data</h2>
+            </div>
+          </div>
+          <p class="form-help">The records are stored only in this browser. Export a backup before clearing Safari data or deleting the Home Screen app.</p>
+          <div class="button-stack">
+            <button id="sampleDataButton" class="secondary-button" type="button">Create sample data</button>
+            <button id="exportButton" class="secondary-button" type="button">Export JSON backup</button>
+            <label class="secondary-button file-button">
+              Import JSON backup
+              <input id="importFile" type="file" accept="application/json,.json">
+            </label>
+            <button id="resetButton" class="danger-button" type="button">Delete all test data</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <button class="nav-button active" type="button" data-view="home">
+        <span class="nav-icon">H</span>
+        <span>Home</span>
+      </button>
+      <button class="nav-button" type="button" data-view="transactions">
+        <span class="nav-icon">T</span>
+        <span>Records</span>
+      </button>
+      <button class="nav-button add-nav-button" type="button" data-view="add">
+        <span class="plus-icon">+</span>
+        <span>Add</span>
+      </button>
+      <button class="nav-button" type="button" data-view="settings">
+        <span class="nav-icon">S</span>
+        <span>Setup</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
