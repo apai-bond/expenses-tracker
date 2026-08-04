@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "pocket-budget-v1";
+const CACHE_NAME = "pocket-budget-v2-theme";
 const LOCAL_ASSETS = [
   "./",
   "index.html",

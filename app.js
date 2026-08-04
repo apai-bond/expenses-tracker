@@ -11,6 +11,12 @@ const state = {
   toastTimer: null
 };
 
+const THEME_STORAGE_KEY = "pocket-budget-theme";
+const THEME_COLORS = {
+  light: "#f3f6f8",
+  dark: "#0d1514"
+};
+
 const CHART_COLORS = [
   "#0f766e",
   "#315f93",
@@ -23,6 +29,7 @@ const CHART_COLORS = [
 document.addEventListener("DOMContentLoaded", initializeApp);
 
 async function initializeApp() {
+  initializeTheme();
   bindEvents();
   document.getElementById("monthPicker").value = state.currentMonth;
   setDefaultTransactionDate();
@@ -41,6 +48,8 @@ async function initializeApp() {
 }
 
 function bindEvents() {
+  document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+
   document.querySelectorAll("[data-view]").forEach((button) => {
     button.addEventListener("click", () => {
       const view = button.dataset.view;
@@ -83,6 +92,74 @@ function bindEvents() {
   document.getElementById("resetButton").addEventListener("click", resetAllData);
 
   window.addEventListener("resize", debounce(() => renderDashboard(), 150));
+}
+
+function initializeTheme() {
+  const savedTheme = getSavedTheme();
+  const systemTheme = getSystemTheme();
+  applyTheme(savedTheme || systemTheme, false);
+
+  const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+  if (!media) return;
+
+  const handleSystemThemeChange = (event) => {
+    if (!getSavedTheme()) {
+      applyTheme(event.matches ? "dark" : "light", false);
+    }
+  };
+
+  if (typeof media.addEventListener === "function") {
+    media.addEventListener("change", handleSystemThemeChange);
+  } else if (typeof media.addListener === "function") {
+    media.addListener(handleSystemThemeChange);
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  applyTheme(nextTheme, true);
+  renderDashboard();
+  showToast(`${capitalize(nextTheme)} mode enabled.`);
+}
+
+function applyTheme(theme, savePreference) {
+  const resolvedTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = resolvedTheme;
+  document.documentElement.style.colorScheme = resolvedTheme;
+
+  if (savePreference) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, resolvedTheme);
+    } catch (error) {
+      console.warn("Theme preference could not be saved:", error);
+    }
+  }
+
+  const meta = document.getElementById("themeColorMeta");
+  if (meta) meta.setAttribute("content", THEME_COLORS[resolvedTheme]);
+
+  const toggle = document.getElementById("themeToggle");
+  const icon = document.getElementById("themeIcon");
+  if (toggle && icon) {
+    const targetTheme = resolvedTheme === "dark" ? "light" : "dark";
+    icon.textContent = resolvedTheme === "dark" ? "☀" : "☾";
+    toggle.setAttribute("aria-label", `Switch to ${targetTheme} mode`);
+    toggle.setAttribute("title", `Switch to ${targetTheme} mode`);
+  }
+}
+
+function getSavedTheme() {
+  try {
+    const saved = localStorage.getItem(THEME_STORAGE_KEY);
+    return saved === "light" || saved === "dark" ? saved : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getSystemTheme() {
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 async function loadPythonEngine() {
@@ -550,7 +627,7 @@ function drawDoughnut(canvas, data) {
 
   if (total <= 0) {
     context.beginPath();
-    context.strokeStyle = "#e2ebe8";
+    context.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--canvas-empty").trim() || "#e2ebe8";
     context.arc(center, center, radius, 0, Math.PI * 2);
     context.stroke();
     return;

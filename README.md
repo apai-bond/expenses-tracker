@@ -106,3 +106,7 @@ It calculates:
 - expense totals by category
 
 Change or add formulas there, refresh the app, and inspect how the dashboard changes.
+
+## Appearance toggle
+
+Use the moon/sun button beside the month selector to switch between Light and Dark mode. On the first visit the app follows the device appearance. After the button is used, the selected theme is remembered locally in that browser.

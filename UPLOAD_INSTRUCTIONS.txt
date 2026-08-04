@@ -1,0 +1,15 @@
+POCKET BUDGET THEME UPDATE V2
+
+Upload these replacement files to the root of your existing GitHub repository:
+- index.html
+- styles.css
+- app.js
+- service-worker.js
+- README.md (documentation only; optional)
+
+Commit message suggestion:
+Add light and dark mode toggle
+
+The service worker cache name has been updated to pocket-budget-v2-theme.
+After GitHub Pages finishes deploying, open the site in Safari and refresh it.
+If the Home Screen app still shows the old design, close it fully and open it again.
