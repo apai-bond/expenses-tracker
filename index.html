@@ -18,17 +18,20 @@
       const theme = saved === "light" || saved === "dark" ? saved : (systemDark ? "dark" : "light");
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = theme;
+      if (window.navigator.standalone === true) {
+        document.documentElement.classList.add("ios-standalone");
+      }
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest?v=8">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=8">
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=8">
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="manifest" href="manifest.webmanifest?v=9">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=9">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=9">
+  <link rel="stylesheet" href="styles.css?v=9">
 
-  <script src="cycle.js?v=8" defer></script>
-  <script src="db.js?v=8" defer></script>
-  <script src="app.js?v=8" defer></script>
+  <script src="cycle.js?v=9" defer></script>
+  <script src="db.js?v=9" defer></script>
+  <script src="app.js?v=9" defer></script>
 </head>
 <body>
   <div class="app-shell">
