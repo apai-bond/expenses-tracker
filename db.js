@@ -118,8 +118,9 @@ const BudgetDB = (() => {
     const db = await open();
     const tx = db.transaction("months", "readwrite");
     const done = transactionDone(tx);
+    const { cycleEndDate: _calculatedOnly, ...storedRecord } = monthRecord;
     tx.objectStore("months").put({
-      ...monthRecord,
+      ...storedRecord,
       salary: Number(monthRecord.salary || 0),
       savingsTarget: Number(monthRecord.savingsTarget || 0),
       updatedAt: new Date().toISOString()
@@ -133,6 +134,20 @@ const BudgetDB = (() => {
     const done = transactionDone(tx);
     const index = tx.objectStore("transactions").index("month");
     const records = await requestToPromise(index.getAll(IDBKeyRange.only(month)));
+    await done;
+    return records.sort((a, b) => {
+      const dateCompare = String(b.date).localeCompare(String(a.date));
+      return dateCompare || Number(b.id || 0) - Number(a.id || 0);
+    });
+  }
+
+  async function getTransactionsByDateRange(startDate, endDate) {
+    const db = await open();
+    const tx = db.transaction("transactions", "readonly");
+    const done = transactionDone(tx);
+    const index = tx.objectStore("transactions").index("date");
+    const range = IDBKeyRange.bound(String(startDate), String(endDate));
+    const records = await requestToPromise(index.getAll(range));
     await done;
     return records.sort((a, b) => {
       const dateCompare = String(b.date).localeCompare(String(a.date));
@@ -217,7 +232,7 @@ const BudgetDB = (() => {
 
     return {
       app: "Pocket Budget",
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       months,
       transactions,
@@ -265,6 +280,7 @@ const BudgetDB = (() => {
     getMonth,
     saveMonth,
     getTransactionsByMonth,
+    getTransactionsByDateRange,
     addTransaction,
     updateTransaction,
     deleteTransaction,

@@ -21,13 +21,14 @@
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest?v=7">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7">
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=7">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="manifest" href="manifest.webmanifest?v=8">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=8">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=8">
+  <link rel="stylesheet" href="styles.css?v=8">
 
-  <script src="db.js?v=7" defer></script>
-  <script src="app.js?v=7" defer></script>
+  <script src="cycle.js?v=8" defer></script>
+  <script src="db.js?v=8" defer></script>
+  <script src="app.js?v=8" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -37,7 +38,7 @@
         <h1>Pocket Budget</h1>
       </div>
       <div class="topbar-actions">
-        <label class="month-label" for="monthPicker">Month</label>
+        <label class="month-label" for="monthPicker">Budget month</label>
         <div class="topbar-control-row">
           <button id="themeToggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
             <span id="themeIcon" aria-hidden="true">&#9790;</span>
@@ -49,11 +50,19 @@
 
     <div class="engine-status" id="engineStatus">Starting local database...</div>
 
+    <section class="cycle-strip" aria-live="polite">
+      <div>
+        <span>Salary cycle</span>
+        <strong id="cycleRangeLabel">Loading cycle...</strong>
+      </div>
+      <small id="cycleBudgetLabel">Budget month</small>
+    </section>
+
     <main>
       <section id="homeView" class="view active" aria-label="Home dashboard">
         <div id="setupNotice" class="notice hidden">
           <strong>Set up this month first.</strong>
-          <span>Add your salary and saving target in Monthly Setup.</span>
+          <span>Add your salary, saving target, and actual salary date in Monthly Setup.</span>
           <button type="button" data-go-view="settings">Open setup</button>
         </div>
 
@@ -66,7 +75,7 @@
           <article class="summary-card expense-card">
             <span>Expenses</span>
             <strong id="totalExpenses">RM 0.00</strong>
-            <small>Spent this month</small>
+            <small>Spent in this salary cycle</small>
           </article>
           <article class="summary-card saving-card">
             <span>Saved</span>
@@ -103,7 +112,7 @@
             <strong id="topCategory">-</strong>
           </article>
           <article class="mini-card">
-            <span>Daily spending</span>
+            <span>Daily average</span>
             <strong id="averageDaily">RM 0.00</strong>
           </article>
         </div>
@@ -111,7 +120,7 @@
         <section class="panel">
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">MONTHLY REPORT</p>
+              <p class="section-kicker">SALARY CYCLE REPORT</p>
               <h2>Expenses by category</h2>
             </div>
           </div>
@@ -154,6 +163,7 @@
           <div>
             <p class="section-kicker">HISTORY</p>
             <h2>Transactions</h2>
+            <p id="transactionsCycleLabel" class="page-context"></p>
           </div>
           <span id="transactionCount" class="count-badge">0 records</span>
         </div>
@@ -176,6 +186,7 @@
           <div>
             <p class="section-kicker">NEW RECORD</p>
             <h2 id="transactionFormTitle">Add transaction</h2>
+            <p id="addCycleLabel" class="page-context"></p>
           </div>
         </div>
 
@@ -229,7 +240,25 @@
         </div>
 
         <form id="monthSetupForm" class="panel form-panel">
-          <p class="form-help">These values apply to <strong id="setupMonthName">this month</strong>.</p>
+          <p class="form-help">These values apply to the <strong id="setupMonthName">selected month</strong> budget.</p>
+
+          <label class="field">
+            <span>Salary received / cycle start date</span>
+            <input id="cycleStartDate" type="date" required>
+            <small class="field-help">
+              Automatic date is <strong id="automaticSalaryDate">the 27th</strong>. If it falls on Saturday or Sunday,
+              the app moves it to the previous Friday. For a public holiday, select the actual earlier salary date manually.
+            </small>
+          </label>
+
+          <div class="cycle-preview-card">
+            <span>Expense recording period</span>
+            <strong id="setupCyclePreview">Loading cycle...</strong>
+            <small id="cycleStartMode"></small>
+          </div>
+
+          <button id="automaticCycleButton" class="secondary-button" type="button">Use automatic salary date</button>
+
           <label class="field">
             <span>Monthly salary</span>
             <div class="amount-input-wrap small">

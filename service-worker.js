@@ -1,20 +1,21 @@
 "use strict";
 
-const CACHE_NAME = "pocket-budget-v7-flat-add-icon";
+const CACHE_NAME = "pocket-budget-v8-salary-cycle";
 const LOCAL_ASSETS = [
   "./",
   "index.html",
-  "styles.css?v=7",
-  "db.js?v=7",
-  "app.js?v=7",
-  "calculations.py?v=7",
-  "manifest.webmanifest?v=7",
-  "icons/icon-192.png?v=7",
-  "icons/icon-512.png?v=7",
-  "icons/icon-1024.png?v=7",
-  "icons/apple-touch-icon.png?v=7",
-  "icons/favicon.svg?v=7",
-  "icons/app-icon.svg?v=7"
+  "styles.css?v=8",
+  "cycle.js?v=8",
+  "db.js?v=8",
+  "app.js?v=8",
+  "calculations.py?v=8",
+  "manifest.webmanifest?v=8",
+  "icons/icon-192.png?v=8",
+  "icons/icon-512.png?v=8",
+  "icons/icon-1024.png?v=8",
+  "icons/apple-touch-icon.png?v=8",
+  "icons/favicon.svg?v=8",
+  "icons/app-icon.svg?v=8"
 ];
 
 self.addEventListener("install", (event) => {

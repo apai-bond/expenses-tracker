@@ -6,7 +6,6 @@ The function returns a JSON string so JavaScript can render the result.
 
 from __future__ import annotations
 
-import calendar
 import json
 from collections import defaultdict
 from datetime import date
@@ -62,16 +61,21 @@ def calculate_monthly_summary(month_json: str, transactions_json: str) -> str:
     savings_rate = round((savings / total_income) * 100, 1) if total_income else 0.0
     savings_progress = round((savings / savings_target) * 100, 1) if savings_target else 0.0
 
-    selected_month = str(month_record.get("month") or "")
     average_daily = 0.0
-    days_in_month = 0
+    cycle_days = 0
+    elapsed_days = 0
 
     try:
-        year, month_number = (int(part) for part in selected_month.split("-", 1))
-        days_in_month = calendar.monthrange(year, month_number)[1]
+        cycle_start = date.fromisoformat(str(month_record.get("cycleStartDate") or ""))
+        cycle_end = date.fromisoformat(str(month_record.get("cycleEndDate") or ""))
         today = date.today()
-        elapsed_days = today.day if (today.year == year and today.month == month_number) else days_in_month
-        average_daily = round(expenses / max(elapsed_days, 1), 2)
+        cycle_days = max((cycle_end - cycle_start).days + 1, 0)
+
+        if today >= cycle_start:
+            last_day = min(today, cycle_end)
+            elapsed_days = max((last_day - cycle_start).days + 1, 0)
+
+        average_daily = round(expenses / elapsed_days, 2) if elapsed_days else 0.0
     except (ValueError, TypeError):
         pass
 
@@ -87,7 +91,8 @@ def calculate_monthly_summary(month_json: str, transactions_json: str) -> str:
         "savingsProgress": savings_progress,
         "topCategory": top_category,
         "averageDaily": average_daily,
-        "daysInMonth": days_in_month,
+        "cycleDays": cycle_days,
+        "elapsedDays": elapsed_days,
         "transactionCount": len(transactions),
         "categoryTotals": category_totals,
     }

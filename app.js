@@ -4,6 +4,8 @@ const state = {
   currentMonth: getLocalMonth(new Date()),
   currentView: "home",
   monthRecord: null,
+  nextMonthRecord: null,
+  cycle: null,
   transactions: [],
   categories: [],
   python: null,
@@ -31,11 +33,11 @@ document.addEventListener("DOMContentLoaded", initializeApp);
 async function initializeApp() {
   initializeTheme();
   bindEvents();
-  document.getElementById("monthPicker").value = state.currentMonth;
-  setDefaultTransactionDate();
 
   try {
     await BudgetDB.initialize();
+    state.currentMonth = await getBudgetMonthForDate(getLocalDate(new Date()));
+    document.getElementById("monthPicker").value = state.currentMonth;
     setEngineStatus("Local database ready. Loading Python calculations...", "");
     await refreshAll();
     loadPythonEngine();
@@ -66,8 +68,8 @@ function bindEvents() {
 
   document.getElementById("monthPicker").addEventListener("change", async (event) => {
     state.currentMonth = event.target.value || getLocalMonth(new Date());
-    setDefaultTransactionDate();
     await refreshAll();
+    resetTransactionForm();
   });
 
   document.querySelectorAll(".type-button").forEach((button) => {
@@ -81,6 +83,11 @@ function bindEvents() {
   });
 
   document.getElementById("monthSetupForm").addEventListener("submit", saveMonthSetup);
+  document.getElementById("cycleStartDate").addEventListener("input", updateSetupCyclePreview);
+  document.getElementById("automaticCycleButton").addEventListener("click", () => {
+    document.getElementById("cycleStartDate").value = BudgetCycle.calculateAutomaticStart(state.currentMonth);
+    updateSetupCyclePreview();
+  });
   document.getElementById("categoryForm").addEventListener("submit", addCategoryFromForm);
 
   document.getElementById("transactionSearch").addEventListener("input", renderAllTransactions);
@@ -169,7 +176,7 @@ async function loadPythonEngine() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.3/full/"
     });
 
-    const response = await fetch("calculations.py", { cache: "no-cache" });
+    const response = await fetch("calculations.py?v=8", { cache: "no-cache" });
     if (!response.ok) {
       throw new Error("Could not load calculations.py");
     }
@@ -187,17 +194,29 @@ async function loadPythonEngine() {
 }
 
 async function refreshAll() {
-  const [monthRecord, transactions, categories] = await Promise.all([
+  const nextMonth = BudgetCycle.addMonths(state.currentMonth, 1);
+  const [monthRecord, nextMonthRecord, categories] = await Promise.all([
     BudgetDB.getMonth(state.currentMonth),
-    BudgetDB.getTransactionsByMonth(state.currentMonth),
+    BudgetDB.getMonth(nextMonth),
     BudgetDB.getAllCategories()
   ]);
 
-  state.monthRecord = monthRecord;
+  const cycle = BudgetCycle.getRange(state.currentMonth, monthRecord, nextMonthRecord);
+  const transactions = await BudgetDB.getTransactionsByDateRange(cycle.startDate, cycle.endDate);
+
+  state.monthRecord = {
+    ...monthRecord,
+    cycleStartDate: cycle.startDate,
+    cycleEndDate: cycle.endDate
+  };
+  state.nextMonthRecord = nextMonthRecord;
+  state.cycle = cycle;
   state.transactions = transactions;
   state.categories = categories;
 
+  renderCycleInformation();
   populateMonthSetup();
+  updateTransactionDateBounds();
   renderCategoryOptions();
   renderCategoryList();
   renderAllTransactions();
@@ -234,26 +253,52 @@ async function saveMonthSetup(event) {
 
   const salary = numberValue(document.getElementById("monthlySalary").value);
   const savingsTarget = numberValue(document.getElementById("monthlySavingTarget").value);
+  const cycleStartDate = document.getElementById("cycleStartDate").value;
+  const nextStartDate = BudgetCycle.resolveStart(
+    BudgetCycle.addMonths(state.currentMonth, 1),
+    state.nextMonthRecord
+  );
+
+  if (!BudgetCycle.isValidCycleStart(state.currentMonth, cycleStartDate)) {
+    showToast("The salary date must be within the previous calendar month.");
+    return;
+  }
+
+  if (cycleStartDate >= nextStartDate) {
+    showToast("The salary date must be earlier than the next salary cycle.");
+    return;
+  }
 
   state.monthRecord = {
     ...state.monthRecord,
     month: state.currentMonth,
     salary,
     savingsTarget,
+    cycleStartDate,
     createdAt: state.monthRecord?.createdAt || new Date().toISOString()
   };
 
   await BudgetDB.saveMonth(state.monthRecord);
   await refreshAll();
-  showToast("Monthly setup saved.");
+  showToast("Monthly setup and salary cycle saved.");
   showView("home");
 }
 
 function populateMonthSetup() {
-  if (!state.monthRecord) return;
+  if (!state.monthRecord || !state.cycle) return;
+
+  const bounds = BudgetCycle.previousMonthBounds(state.currentMonth);
+  const automaticStart = BudgetCycle.calculateAutomaticStart(state.currentMonth);
+  const cycleInput = document.getElementById("cycleStartDate");
+
   document.getElementById("monthlySalary").value = state.monthRecord.salary || "";
   document.getElementById("monthlySavingTarget").value = state.monthRecord.savingsTarget || "";
   document.getElementById("setupMonthName").textContent = formatMonthName(state.currentMonth);
+  document.getElementById("automaticSalaryDate").textContent = formatDate(automaticStart);
+  cycleInput.min = bounds.min;
+  cycleInput.max = bounds.max;
+  cycleInput.value = state.cycle.startDate;
+  updateSetupCyclePreview();
 }
 
 async function saveTransactionFromForm(event) {
@@ -276,7 +321,12 @@ async function saveTransactionFromForm(event) {
     return;
   }
 
-  const month = date.slice(0, 7);
+  if (!state.cycle || !BudgetCycle.isWithinRange(date, state.cycle.startDate, state.cycle.endDate)) {
+    showToast(`Choose a date within ${formatCycleRange(state.cycle)}.`);
+    return;
+  }
+
+  const month = state.currentMonth;
   const existing = editingId
     ? state.transactions.find((record) => Number(record.id) === Number(editingId))
     : null;
@@ -299,11 +349,6 @@ async function saveTransactionFromForm(event) {
     delete record.id;
     await BudgetDB.addTransaction(record);
     showToast("Transaction saved.");
-  }
-
-  if (state.currentMonth !== month) {
-    state.currentMonth = month;
-    document.getElementById("monthPicker").value = month;
   }
 
   resetTransactionForm();
@@ -466,7 +511,7 @@ function renderAllTransactions() {
   document.getElementById("transactionCount").textContent = `${filtered.length} ${filtered.length === 1 ? "record" : "records"}`;
 
   if (!filtered.length) {
-    container.innerHTML = emptyState("No matching transactions for this month.");
+    container.innerHTML = emptyState("No matching transactions for this salary cycle.");
     return;
   }
 
@@ -548,9 +593,11 @@ function calculateSummaryFallback(monthRecord, transactions) {
     .sort((a, b) => b.amount - a.amount);
 
   const totalIncome = roundMoney(salary + extraIncome);
-  const currentDate = new Date();
-  const selectedIsCurrent = state.currentMonth === getLocalMonth(currentDate);
-  const elapsedDays = selectedIsCurrent ? currentDate.getDate() : daysInMonth(state.currentMonth);
+  const elapsedDays = calculateElapsedCycleDays(
+    monthRecord.cycleStartDate,
+    monthRecord.cycleEndDate,
+    getLocalDate(new Date())
+  );
 
   return {
     salary,
@@ -563,7 +610,8 @@ function calculateSummaryFallback(monthRecord, transactions) {
     savingsRate: totalIncome ? roundMoney((savings / totalIncome) * 100) : 0,
     savingsProgress: savingsTarget ? roundMoney((savings / savingsTarget) * 100) : 0,
     topCategory: categoryTotals[0]?.category || "-",
-    averageDaily: roundMoney(expenses / Math.max(elapsedDays, 1)),
+    averageDaily: elapsedDays > 0 ? roundMoney(expenses / elapsedDays) : 0,
+    elapsedDays,
     categoryTotals,
     transactionCount: transactions.length
   };
@@ -674,7 +722,7 @@ function renderCategoryBars(categoryTotals, total) {
   const items = categoryTotals.slice(0, 6);
 
   if (!items.length) {
-    container.innerHTML = emptyState("No expense data for this month.");
+    container.innerHTML = emptyState("No expense data for this salary cycle.");
     return;
   }
 
@@ -696,7 +744,7 @@ function renderCategoryBars(categoryTotals, total) {
 
 async function createSampleData() {
   if (state.transactions.length) {
-    const confirmed = window.confirm("This month already has records. Add sample data anyway?");
+    const confirmed = window.confirm("This salary cycle already has records. Add sample data anyway?");
     if (!confirmed) return;
   }
 
@@ -718,8 +766,8 @@ async function createSampleData() {
     ["saving", 500.00, "Emergency Fund", 3, "Monthly contribution"]
   ];
 
-  for (const [type, amount, category, day, note] of samples) {
-    const date = dateWithinMonth(state.currentMonth, day);
+  for (const [type, amount, category, dayOffset, note] of samples) {
+    const date = dateWithinCycle(state.cycle, dayOffset);
     await BudgetDB.addTransaction({
       type,
       amount,
@@ -761,7 +809,10 @@ async function importBackup(event) {
     const text = await file.text();
     const data = JSON.parse(text);
     await BudgetDB.importData(data);
+    state.currentMonth = await getBudgetMonthForDate(getLocalDate(new Date()));
+    document.getElementById("monthPicker").value = state.currentMonth;
     await refreshAll();
+    resetTransactionForm();
     showToast("Backup imported successfully.");
     showView("home");
   } catch (error) {
@@ -775,8 +826,10 @@ async function resetAllData() {
   if (!confirmed) return;
 
   await BudgetDB.clearAll();
-  resetTransactionForm();
+  state.currentMonth = await getBudgetMonthForDate(getLocalDate(new Date()));
+  document.getElementById("monthPicker").value = state.currentMonth;
   await refreshAll();
+  resetTransactionForm();
   showToast("All test data deleted.");
   showView("home");
 }
@@ -816,10 +869,101 @@ function registerServiceWorker() {
   });
 }
 
+async function getBudgetMonthForDate(dateValue) {
+  const calendarMonth = String(dateValue).slice(0, 7);
+  const nextBudgetMonth = BudgetCycle.addMonths(calendarMonth, 1);
+  const nextMonthRecord = await BudgetDB.getMonth(nextBudgetMonth);
+  return BudgetCycle.budgetMonthForDate(dateValue, nextMonthRecord);
+}
+
+function renderCycleInformation() {
+  if (!state.cycle) return;
+
+  const rangeText = formatCycleRange(state.cycle);
+  const monthText = `${formatMonthName(state.currentMonth)} budget`;
+  const values = {
+    cycleRangeLabel: rangeText,
+    cycleBudgetLabel: monthText,
+    transactionsCycleLabel: `${monthText}: ${rangeText}`,
+    addCycleLabel: `Transaction date must be within ${rangeText}.`
+  };
+
+  Object.entries(values).forEach(([id, text]) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = text;
+  });
+}
+
+function updateSetupCyclePreview() {
+  if (!state.nextMonthRecord) return;
+
+  const input = document.getElementById("cycleStartDate");
+  const preview = document.getElementById("setupCyclePreview");
+  const mode = document.getElementById("cycleStartMode");
+  const automaticStart = BudgetCycle.calculateAutomaticStart(state.currentMonth);
+  const startDate = input.value;
+  const nextMonth = BudgetCycle.addMonths(state.currentMonth, 1);
+  const nextStartDate = BudgetCycle.resolveStart(nextMonth, state.nextMonthRecord);
+
+  input.setCustomValidity("");
+
+  if (!BudgetCycle.isValidCycleStart(state.currentMonth, startDate)) {
+    input.setCustomValidity("Select a date within the previous calendar month.");
+    preview.textContent = "Select a valid salary date.";
+    mode.textContent = "";
+    return;
+  }
+
+  if (startDate >= nextStartDate) {
+    input.setCustomValidity("The start date must be before the next salary cycle.");
+    preview.textContent = "The cycle start must be before the next salary date.";
+    mode.textContent = "";
+    return;
+  }
+
+  const proposedCycle = {
+    startDate,
+    endDate: BudgetCycle.addDays(nextStartDate, -1)
+  };
+  preview.textContent = formatCycleRange(proposedCycle);
+  mode.textContent = startDate === automaticStart
+    ? "Automatic date: the 27th, moved back to Friday when it falls on a weekend."
+    : "Manual date selected for an early salary payment or public holiday.";
+}
+
+function updateTransactionDateBounds() {
+  if (!state.cycle) return;
+
+  const input = document.getElementById("transactionDate");
+  input.min = state.cycle.startDate;
+  input.max = state.cycle.endDate;
+
+  const editing = Boolean(document.getElementById("editingId").value);
+  if (!editing && !BudgetCycle.isWithinRange(input.value, state.cycle.startDate, state.cycle.endDate)) {
+    setDefaultTransactionDate();
+  }
+}
+
 function setDefaultTransactionDate() {
   const input = document.getElementById("transactionDate");
   const today = getLocalDate(new Date());
-  input.value = today.startsWith(state.currentMonth) ? today : `${state.currentMonth}-01`;
+
+  if (!state.cycle) {
+    input.value = today;
+    return;
+  }
+
+  input.min = state.cycle.startDate;
+  input.max = state.cycle.endDate;
+  input.value = BudgetCycle.isWithinRange(today, state.cycle.startDate, state.cycle.endDate)
+    ? today
+    : state.cycle.startDate;
+}
+
+function calculateElapsedCycleDays(startDate, endDate, today) {
+  if (!startDate || !endDate || today < startDate) return 0;
+  const lastDate = today > endDate ? endDate : today;
+  return BudgetCycle.daysBetweenInclusive(startDate, lastDate);
 }
 
 function setEngineStatus(message, className) {
@@ -882,15 +1026,33 @@ function getLocalDate(dateValue) {
   return `${year}-${month}-${day}`;
 }
 
-function dateWithinMonth(monthValue, requestedDay) {
-  const maxDay = daysInMonth(monthValue);
-  const day = String(Math.min(requestedDay, maxDay)).padStart(2, "0");
-  return `${monthValue}-${day}`;
+function dateWithinCycle(cycle, requestedOffset) {
+  const maxOffset = Math.max(Number(cycle?.totalDays || 1) - 1, 0);
+  const offset = Math.min(Math.max(Number(requestedOffset) || 0, 0), maxOffset);
+  return BudgetCycle.addDays(cycle.startDate, offset);
 }
 
-function daysInMonth(monthValue) {
-  const [year, month] = monthValue.split("-").map(Number);
-  return new Date(year, month, 0).getDate();
+function formatCycleRange(cycle) {
+  if (!cycle?.startDate || !cycle?.endDate) return "";
+
+  const [startYear, startMonth, startDay] = cycle.startDate.split("-").map(Number);
+  const [endYear, endMonth, endDay] = cycle.endDate.split("-").map(Number);
+  const start = new Date(startYear, startMonth - 1, startDay);
+  const end = new Date(endYear, endMonth - 1, endDay);
+  const sameYear = startYear === endYear;
+
+  const startText = new Intl.DateTimeFormat("en-MY", {
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" })
+  }).format(start);
+  const endText = new Intl.DateTimeFormat("en-MY", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  }).format(end);
+
+  return `${startText} - ${endText}`;
 }
 
 function numberValue(value) {

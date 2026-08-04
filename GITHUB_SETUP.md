@@ -1,14 +1,36 @@
-# Publish Pocket Budget with GitHub Pages
+# Publish Pocket Budget Version 8 with GitHub Pages
 
-1. Extract this ZIP file on your Windows computer.
-2. Create a new public GitHub repository named `pocket-budget`.
-3. Do not initialize it with a README, .gitignore, or license.
-4. Open the extracted folder. Upload the contents of the folder, not the outer folder and not the ZIP itself.
-5. Confirm `index.html` is visible at the repository root beside `app.js`, `db.js`, and `styles.css`.
-6. In the repository, open Settings > Pages.
-7. Under Build and deployment, set Source to `Deploy from a branch`.
-8. Select branch `main`, folder `/(root)`, and Save.
-9. Open the Pages URL shown by GitHub.
-10. On iPhone Safari, open the URL, tap Share, choose Add to Home Screen, enable Open as Web App, and tap Add.
+1. Extract the ZIP file on your Windows computer.
+2. Open your existing `pocket-budget` GitHub repository.
+3. Upload all replacement files to the repository root. Version 8 adds a new file named `cycle.js`.
+4. Confirm these files are directly beside `index.html`:
 
-Do not upload exported personal backup JSON files to the repository.
+```text
+app.js
+cycle.js
+db.js
+styles.css
+calculations.py
+service-worker.js
+manifest.webmanifest
+```
+
+5. Commit the changes to the `main` branch.
+6. In **Settings > Pages**, keep the source set to `main` and `/(root)`.
+7. Wait for GitHub Pages to redeploy.
+8. Open the Pages URL and refresh it once.
+9. For an installed iPhone Home Screen app, close the app completely and reopen it.
+
+Version 8 uses this service-worker cache:
+
+```text
+pocket-budget-v8-salary-cycle
+```
+
+If an old version remains in a desktop browser, open:
+
+```text
+https://YOUR-USERNAME.github.io/pocket-budget/?v=8
+```
+
+Do not upload exported personal backup JSON files to the public repository.

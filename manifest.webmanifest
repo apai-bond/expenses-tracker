@@ -1,7 +1,7 @@
 {
-  "name": "Pocket Budget - Monthly Expense Tracker",
+  "name": "Pocket Budget - Salary Cycle Expense Tracker",
   "short_name": "Pocket Budget",
-  "description": "A personal monthly income, saving, and expense tracker with local browser storage.",
+  "description": "A personal salary-cycle income, saving, and expense tracker with local browser storage.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

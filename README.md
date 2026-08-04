@@ -1,36 +1,52 @@
-# Pocket Budget - Test Version
+# Pocket Budget - Salary Cycle Test Version
 
-Pocket Budget is a mobile-first monthly expense tracker that can run in Safari on an iPhone.
+Pocket Budget is a mobile-first personal expense tracker that can run in Safari on an iPhone. Records are stored locally in IndexedDB on the device.
 
-## Included in Version 1
+## Version 8 features
 
-- Monthly salary setup
-- Monthly saving target
+- Budget month based on the salary cycle rather than the 1st to the last day of the month
+- Standard salary day set to the 27th of the previous month
+- Automatic weekend adjustment to the previous Friday
+- Manual actual salary-date adjustment for public holidays or other early payments
 - Expense, income, and saving transactions
+- Monthly salary and saving target
 - Custom categories
 - Edit and delete transactions
-- Monthly summary cards
-- Expense category doughnut chart
-- Highest-category bars
-- Search and filter
+- Summary cards and expense charts
 - Local IndexedDB database
 - JSON backup and restore
+- Light and Dark appearance
 - Progressive Web App files
 - Python calculation logic through Pyodide
 
-## Important Test-Version Security Note
+## Salary-cycle example
+
+The **August 2026** budget normally covers:
+
+```text
+27 July 2026 to 26 August 2026
+```
+
+Therefore, a transaction entered on 27 July is part of the August budget.
+
+If the 27th falls on a weekend, the automatic date moves backward to Friday. Public holidays are not downloaded because the app is designed to work locally and offline. Use **Setup > Salary received / cycle start date** to enter the actual earlier salary date.
+
+The cycle end is calculated automatically as one day before the next salary date.
+
+## Important test-version security note
 
 This version does not encrypt the local database and does not use a password. Do not enter banking passwords, card numbers, identity documents, or other highly sensitive information.
 
-The financial records are stored in the browser database on the device that opened the app. GitHub contains only the application code when the project is hosted on GitHub Pages.
+GitHub contains only the application code. Salary and expense records remain in the browser database on the device that entered them.
 
-## File Responsibilities
+## File responsibilities
 
 - `index.html`: application screens
-- `styles.css`: iPhone-friendly design
+- `styles.css`: mobile design and Light/Dark appearance
+- `cycle.js`: salary-cycle date calculations
 - `db.js`: IndexedDB local database operations
-- `app.js`: interface, navigation, charts, and connection to Python
-- `calculations.py`: Python monthly summary calculations
+- `app.js`: interface, navigation, charts, and cycle handling
+- `calculations.py`: Python financial summary calculations
 - `manifest.webmanifest`: installable app information
 - `service-worker.js`: local asset caching
 - `start_server.py`: simple Python development server
@@ -45,68 +61,52 @@ The financial records are stored in the browser database on the device that open
 python start_server.py
 ```
 
-4. Open this address on the computer:
+4. Open:
 
 ```text
-http://localhost:8000
+http://localhost:8000/?v=8
 ```
 
-Do not double-click `index.html`. The app loads `calculations.py` through the web server.
+Do not double-click `index.html`. The app loads its files through the local web server.
 
-## Test on an iPhone on the Same Wi-Fi
+## Test on an iPhone on the same Wi-Fi
 
 1. Keep `python start_server.py` running on the Windows computer.
 2. Run `ipconfig` in Command Prompt.
 3. Find the computer IPv4 address, for example `192.168.1.50`.
-4. On the iPhone, open Safari and enter:
+4. Open Safari on the iPhone and enter:
 
 ```text
-http://192.168.1.50:8000
+http://192.168.1.50:8000/?v=8
 ```
 
-Windows Firewall may ask whether Python is allowed on the private network. Allow private-network access for testing.
-
-This local HTTP test is suitable for checking the interface and records. Full PWA caching works best after HTTPS deployment.
+The computer and iPhone must be connected to the same local network. Allow Python through Windows Firewall on private networks when prompted.
 
 ## Publish with GitHub Pages
 
-1. Create a GitHub repository.
-2. Upload all project files, preserving the `icons` folder.
-3. Open repository Settings.
-4. Open Pages.
-5. Select deployment from the main branch and root folder.
-6. Open the generated HTTPS address in iPhone Safari.
-7. Tap Share, then Add to Home Screen.
+Upload all project files to the repository root, including the new `cycle.js` file. GitHub Pages should deploy from the `main` branch and `/ (root)` folder.
 
-## Data Backup
+After deployment, close and reopen the Home Screen app. The Version 8 service worker uses this cache name:
 
-Use Setup > Export JSON backup. Save the file to the iPhone Files app, iCloud Drive, Google Drive, or Dropbox.
-
-Use Setup > Import JSON backup to restore it. Import replaces all current local app data.
-
-Clearing Safari website data, changing browser, or removing stored site data can delete the local database. Keep backups while testing.
-
-## Where to Learn Python
-
-Start in `calculations.py`. The main function is:
-
-```python
-calculate_monthly_summary(month_json, transactions_json)
+```text
+pocket-budget-v8-salary-cycle
 ```
 
-It calculates:
+## Data backup
+
+Use **Setup > Export JSON backup** and keep the file privately. Importing a backup replaces the current local data.
+
+Clearing Safari website data or removing stored site data can delete the local database. Keep backups while testing.
+
+## Python learning area
+
+Start in `calculations.py`. It calculates:
 
 - total income
 - total expenses
 - total savings
 - available balance
 - savings rate
-- savings target progress
-- average daily spending
+- saving-target progress
+- average daily spending based on elapsed salary-cycle days
 - expense totals by category
-
-Change or add formulas there, refresh the app, and inspect how the dashboard changes.
-
-## Appearance toggle
-
-Use the moon/sun button beside the month selector to switch between Light and Dark mode. On the first visit the app follows the device appearance. After the button is used, the selected theme is remembered locally in that browser.
