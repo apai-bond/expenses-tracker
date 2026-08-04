@@ -18,16 +18,16 @@
       const theme = saved === "light" || saved === "dark" ? saved : (systemDark ? "dark" : "light");
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = theme;
-      document.getElementById("themeColorMeta")?.setAttribute("content", theme === "dark" ? "#0d1514" : "#f3f6f8");
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.webmanifest?v=7">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=7">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=7">
+  <link rel="stylesheet" href="styles.css?v=7">
 
-  <script src="db.js" defer></script>
-  <script src="app.js" defer></script>
+  <script src="db.js?v=7" defer></script>
+  <script src="app.js?v=7" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -288,20 +288,43 @@
     </main>
 
     <nav class="bottom-nav" aria-label="Main navigation">
-      <button class="nav-button active" type="button" data-view="home">
-        <span class="nav-icon">H</span>
+      <button class="nav-button active" type="button" data-view="home" aria-label="Home" aria-current="page">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 11.5 12 4l9 7.5"></path>
+            <path d="M5.5 10.5V20h13v-9.5"></path>
+            <path d="M9.5 20v-6h5v6"></path>
+          </svg>
+        </span>
         <span>Home</span>
       </button>
-      <button class="nav-button" type="button" data-view="transactions">
-        <span class="nav-icon">T</span>
+      <button class="nav-button" type="button" data-view="transactions" aria-label="Records">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3h12a2 2 0 0 1 2 2v16H4V5a2 2 0 0 1 2-2Z"></path>
+            <path d="M8 8h8"></path>
+            <path d="M8 12h8"></path>
+            <path d="M8 16h5"></path>
+          </svg>
+        </span>
         <span>Records</span>
       </button>
-      <button class="nav-button add-nav-button" type="button" data-view="add">
-        <span class="plus-icon">+</span>
+      <button class="nav-button add-nav-button" type="button" data-view="add" aria-label="Add transaction">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+        </span>
         <span>Add</span>
       </button>
-      <button class="nav-button" type="button" data-view="settings">
-        <span class="nav-icon">S</span>
+      <button class="nav-button" type="button" data-view="settings" aria-label="Setup">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.55V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.05V3h4v.08a1.7 1.7 0 0 0 1.03 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88 1.7 1.7 0 0 0 1.55 1.03H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"></path>
+          </svg>
+        </span>
         <span>Setup</span>
       </button>
     </nav>

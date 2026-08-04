@@ -1,17 +1,20 @@
 "use strict";
 
-const CACHE_NAME = "pocket-budget-v2-theme";
+const CACHE_NAME = "pocket-budget-v7-flat-add-icon";
 const LOCAL_ASSETS = [
   "./",
   "index.html",
-  "styles.css",
-  "db.js",
-  "app.js",
-  "calculations.py",
-  "manifest.webmanifest",
-  "icons/icon-192.png",
-  "icons/icon-512.png",
-  "icons/apple-touch-icon.png"
+  "styles.css?v=7",
+  "db.js?v=7",
+  "app.js?v=7",
+  "calculations.py?v=7",
+  "manifest.webmanifest?v=7",
+  "icons/icon-192.png?v=7",
+  "icons/icon-512.png?v=7",
+  "icons/icon-1024.png?v=7",
+  "icons/apple-touch-icon.png?v=7",
+  "icons/favicon.svg?v=7",
+  "icons/app-icon.svg?v=7"
 ];
 
 self.addEventListener("install", (event) => {
@@ -32,31 +35,30 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  const requestUrl = new URL(event.request.url);
-
-  if (requestUrl.origin !== self.location.origin) {
-    return;
+async function networkFirst(request, navigationFallback = false) {
+  try {
+    const response = await fetch(request, { cache: "no-store" });
+    if (response && response.status === 200 && response.type === "basic") {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (_) {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+    if (navigationFallback) {
+      const fallback = await caches.match("index.html");
+      if (fallback) return fallback;
+    }
+    return Response.error();
   }
+}
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
+self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
 
-      return fetch(event.request).then((response) => {
-        if (!response || response.status !== 200 || response.type !== "basic") {
-          return response;
-        }
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
 
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      }).catch(() => {
-        if (event.request.mode === "navigate") {
-          return caches.match("index.html");
-        }
-        return Response.error();
-      });
-    })
-  );
+  event.respondWith(networkFirst(event.request, event.request.mode === "navigate"));
 });

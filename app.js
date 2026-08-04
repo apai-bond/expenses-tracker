@@ -213,7 +213,13 @@ function showView(viewName) {
   document.getElementById(nextView + "View").classList.add("active");
 
   document.querySelectorAll(".nav-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === nextView);
+    const isActive = button.dataset.view === nextView;
+    button.classList.toggle("active", isActive);
+    if (isActive) {
+      button.setAttribute("aria-current", "page");
+    } else {
+      button.removeAttribute("aria-current");
+    }
   });
 
   if (nextView === "home") renderDashboard();
@@ -798,10 +804,15 @@ function loadExternalScript(url) {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").catch((error) => {
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("service-worker.js", {
+        updateViaCache: "none"
+      });
+      await registration.update();
+    } catch (error) {
       console.warn("Service worker registration failed:", error);
-    });
+    }
   });
 }
 

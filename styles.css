@@ -825,14 +825,26 @@ button {
 .nav-button {
   display: grid;
   place-items: center;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
+  padding: 5px 4px;
   border: 0;
   border-radius: 16px;
   background: transparent;
   color: var(--muted);
   font-size: 0.68rem;
   font-weight: 800;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.nav-button:active {
+  transform: scale(0.97);
+}
+
+.nav-button:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -2px;
 }
 
 .nav-button.active {
@@ -840,22 +852,44 @@ button {
   color: var(--primary-dark);
 }
 
-.nav-icon,
-.plus-icon {
+.nav-icon {
   display: grid;
   place-items: center;
-  width: 29px;
-  height: 29px;
+  width: 30px;
+  height: 30px;
   border-radius: 10px;
-  font-size: 0.76rem;
-  font-weight: 900;
+  color: currentColor;
 }
 
-.plus-icon {
-  background: var(--primary);
+.nav-icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.add-nav-button .nav-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .add-nav-button .nav-icon {
   color: #ffffff;
-  font-size: 1.35rem;
-  line-height: 1;
+}
+
+.add-nav-button.active .nav-icon {
+  color: var(--primary-dark);
+}
+
+html[data-theme="dark"] .add-nav-button.active .nav-icon {
+  color: #ffffff;
 }
 
 .toast {
@@ -939,4 +973,31 @@ html[data-theme="dark"] .toast {
 
 @media (prefers-reduced-motion: reduce) {
   body { transition: none; }
+}
+
+/* V4 navigation icon fix: explicit SVG rendering prevents stale CSS from
+   turning outline icons into black filled shapes. */
+.nav-icon svg {
+  display: block;
+  width: 23px;
+  height: 23px;
+  overflow: visible;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-icon svg path,
+.nav-icon svg circle,
+.nav-icon svg rect,
+.nav-icon svg line,
+.nav-icon svg polyline {
+  fill: none !important;
+  stroke: currentColor !important;
+}
+
+.add-nav-button .nav-icon svg {
+  width: 23px;
+  height: 23px;
 }
