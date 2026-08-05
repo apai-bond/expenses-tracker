@@ -11,9 +11,20 @@ const state = {
   customSheet: null,
   activeSheetCell: "A1",
   sheetSaveTimer: null,
+  sheetResize: null,
   python: null,
   pythonReady: false,
   toastTimer: null
+};
+
+const SHEET_SIZE_LIMITS = {
+  minColumn: 72,
+  maxColumn: 320,
+  mobileColumn: 112,
+  desktopColumn: 126,
+  minRow: 44,
+  maxRow: 180,
+  defaultRow: 56
 };
 
 const THEME_STORAGE_KEY = "pocket-budget-theme";
@@ -103,6 +114,14 @@ function bindEvents() {
 
   document.getElementById("sheetAddRowButton").addEventListener("click", addCustomSheetRow);
   document.getElementById("sheetAddColumnButton").addEventListener("click", addCustomSheetColumn);
+  document.getElementById("sheetSizeButton").addEventListener("click", toggleSheetSizeControls);
+  document.getElementById("sheetCloseSizeButton").addEventListener("click", () => setSheetSizeControlsOpen(false));
+  document.getElementById("sheetColumnWidth").addEventListener("input", updateSelectedSheetColumnWidth);
+  document.getElementById("sheetRowHeight").addEventListener("input", updateSelectedSheetRowHeight);
+  document.getElementById("sheetApplyWidthAllButton").addEventListener("click", applySelectedWidthToAllColumns);
+  document.getElementById("sheetApplyHeightAllButton").addEventListener("click", applySelectedHeightToAllRows);
+  document.getElementById("sheetResetSelectedSizeButton").addEventListener("click", resetSelectedSheetSize);
+  document.getElementById("sheetResetAllSizesButton").addEventListener("click", resetAllSheetSizes);
   document.getElementById("sheetHeaderButton").addEventListener("click", toggleCustomSheetHeader);
   document.getElementById("sheetExportButton").addEventListener("click", exportCustomSheetCsv);
   document.getElementById("sheetClearButton").addEventListener("click", clearCustomSheetData);
@@ -111,6 +130,7 @@ function bindEvents() {
   const sheetTable = document.getElementById("customSheetTable");
   sheetTable.addEventListener("focusin", handleSheetCellFocus);
   sheetTable.addEventListener("input", handleSheetCellInput);
+  sheetTable.addEventListener("pointerdown", handleSheetResizePointerDown);
 
   window.addEventListener("resize", debounce(() => {
     renderDashboard();
@@ -860,6 +880,24 @@ function normaliseCustomSheet(sheet) {
   const source = sheet || {};
   const rows = Math.min(Math.max(Number(source.rows || 20), 1), 120);
   const cols = Math.min(Math.max(Number(source.cols || 6), 1), 18);
+  const columnWidths = {};
+  const rowHeights = {};
+
+  for (let index = 1; index <= cols; index += 1) {
+    const letter = columnIndexToName(index);
+    const value = Number(source.columnWidths?.[letter]);
+    if (Number.isFinite(value)) {
+      columnWidths[letter] = clampNumber(value, SHEET_SIZE_LIMITS.minColumn, SHEET_SIZE_LIMITS.maxColumn);
+    }
+  }
+
+  for (let row = 1; row <= rows; row += 1) {
+    const value = Number(source.rowHeights?.[row]);
+    if (Number.isFinite(value)) {
+      rowHeights[row] = clampNumber(value, SHEET_SIZE_LIMITS.minRow, SHEET_SIZE_LIMITS.maxRow);
+    }
+  }
+
   return {
     id: source.id || "main",
     name: source.name || "Quick table",
@@ -867,6 +905,8 @@ function normaliseCustomSheet(sheet) {
     cols,
     headerRow: source.headerRow !== false,
     cells: source.cells && typeof source.cells === "object" ? { ...source.cells } : {},
+    columnWidths,
+    rowHeights,
     createdAt: source.createdAt || new Date().toISOString(),
     updatedAt: source.updatedAt || new Date().toISOString()
   };
@@ -878,41 +918,73 @@ function renderCustomSheet() {
   const sheet = normaliseCustomSheet(state.customSheet);
   state.customSheet = sheet;
 
+  const activeCell = parseCellKey(state.activeSheetCell);
+  if (!activeCell || activeCell.row > sheet.rows || activeCell.col > sheet.cols) {
+    state.activeSheetCell = "A1";
+  }
+
   document.getElementById("customSheetTitle").textContent = sheet.name;
   document.getElementById("sheetSizeBadge").textContent = `${sheet.rows} x ${sheet.cols}`;
   document.getElementById("sheetHeaderButton").textContent = sheet.headerRow ? "Header on" : "Header off";
 
   const table = document.getElementById("customSheetTable");
+  const scrollContainer = table.closest(".sheet-scroll");
+  const previousScrollLeft = scrollContainer?.scrollLeft || 0;
+  const previousScrollTop = scrollContainer?.scrollTop || 0;
   const columnHeaders = Array.from({ length: sheet.cols }, (_, index) => columnIndexToName(index + 1));
+  const totalColumnWidth = columnHeaders.reduce((total, letter) => total + getSheetColumnWidth(letter), 42);
 
   const headerHtml = `
     <thead>
       <tr>
         <th class="sheet-corner" aria-label="Cell coordinates"></th>
-        ${columnHeaders.map((letter) => `<th scope="col">${letter}</th>`).join("")}
+        ${columnHeaders.map((letter) => {
+          const width = getSheetColumnWidth(letter);
+          return `
+            <th scope="col" data-sheet-column="${letter}" style="width:${width}px;min-width:${width}px;max-width:${width}px">
+              <span class="sheet-heading-label">${letter}</span>
+              <span class="sheet-resize-handle sheet-column-resize-handle" data-resize-column="${letter}" role="separator" aria-orientation="vertical" aria-label="Resize column ${letter}"></span>
+            </th>`;
+        }).join("")}
       </tr>
     </thead>`;
 
   const bodyHtml = Array.from({ length: sheet.rows }, (_, rowIndex) => {
     const rowNumber = rowIndex + 1;
+    const rowHeight = getSheetRowHeight(rowNumber);
     const isHeaderRow = sheet.headerRow && rowNumber === 1;
     const cells = columnHeaders.map((letter) => {
       const key = `${letter}${rowNumber}`;
+      const width = getSheetColumnWidth(letter);
       const rawValue = getSheetRawValue(key);
       const result = rawValue.trim().startsWith("=") ? formatSheetResult(evaluateSheetCell(key)) : "";
       return `
-        <td class="${isHeaderRow ? "sheet-table-header-cell" : ""}">
-          <div class="sheet-cell-wrap">
+        <td class="${isHeaderRow ? "sheet-table-header-cell" : ""}" data-sheet-column="${letter}" data-sheet-row="${rowNumber}" style="width:${width}px;min-width:${width}px;max-width:${width}px;height:${rowHeight}px">
+          <div class="sheet-cell-wrap" style="height:${rowHeight}px;min-height:${rowHeight}px">
             <input class="sheet-cell-input" data-cell="${key}" value="${escapeHtml(rawValue)}" placeholder="${isHeaderRow ? "Header" : ""}" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cell ${key}">
             <small class="sheet-cell-result" data-result-cell="${key}">${result ? `= ${escapeHtml(result)}` : ""}</small>
           </div>
         </td>`;
     }).join("");
-    return `<tr><th scope="row">${rowNumber}</th>${cells}</tr>`;
+    return `
+      <tr data-sheet-row="${rowNumber}" style="height:${rowHeight}px">
+        <th scope="row" data-sheet-row-header="${rowNumber}" style="height:${rowHeight}px">
+          <span class="sheet-heading-label">${rowNumber}</span>
+          <span class="sheet-resize-handle sheet-row-resize-handle" data-resize-row="${rowNumber}" role="separator" aria-orientation="horizontal" aria-label="Resize row ${rowNumber}"></span>
+        </th>
+        ${cells}
+      </tr>`;
   }).join("");
 
+  table.style.width = `${totalColumnWidth}px`;
   table.innerHTML = `${headerHtml}<tbody>${bodyHtml}</tbody>`;
   setActiveSheetCell(state.activeSheetCell || "A1", false);
+  updateSheetSizeControls();
+
+  if (scrollContainer) {
+    scrollContainer.scrollLeft = previousScrollLeft;
+    scrollContainer.scrollTop = previousScrollTop;
+  }
 }
 
 function handleSheetCellFocus(event) {
@@ -941,6 +1013,7 @@ function setActiveSheetCell(cellKey, syncFormula) {
   const activeInput = document.querySelector(`.sheet-cell-input[data-cell="${cellKey}"]`);
   if (activeInput) activeInput.classList.add("active");
   if (syncFormula) document.getElementById("formulaInput").value = getSheetRawValue(cellKey);
+  updateSheetSizeControls();
 }
 
 function updateActiveCellFromFormulaBar(event) {
@@ -966,6 +1039,259 @@ function setSheetRawValue(cellKey, value) {
   } else {
     state.customSheet.cells[cellKey] = text;
   }
+}
+
+function clampNumber(value, minimum, maximum) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return minimum;
+  return Math.min(Math.max(Math.round(number), minimum), maximum);
+}
+
+function getDefaultSheetColumnWidth() {
+  return window.matchMedia?.("(min-width: 620px)").matches
+    ? SHEET_SIZE_LIMITS.desktopColumn
+    : SHEET_SIZE_LIMITS.mobileColumn;
+}
+
+function getSheetColumnWidth(letter) {
+  const saved = Number(state.customSheet?.columnWidths?.[letter]);
+  return Number.isFinite(saved)
+    ? clampNumber(saved, SHEET_SIZE_LIMITS.minColumn, SHEET_SIZE_LIMITS.maxColumn)
+    : getDefaultSheetColumnWidth();
+}
+
+function getSheetRowHeight(rowNumber) {
+  const saved = Number(state.customSheet?.rowHeights?.[rowNumber]);
+  return Number.isFinite(saved)
+    ? clampNumber(saved, SHEET_SIZE_LIMITS.minRow, SHEET_SIZE_LIMITS.maxRow)
+    : SHEET_SIZE_LIMITS.defaultRow;
+}
+
+function toggleSheetSizeControls() {
+  const panel = document.getElementById("sheetSizeControls");
+  setSheetSizeControlsOpen(panel.hidden);
+}
+
+function setSheetSizeControlsOpen(isOpen) {
+  const panel = document.getElementById("sheetSizeControls");
+  const button = document.getElementById("sheetSizeButton");
+  panel.hidden = !isOpen;
+  button.setAttribute("aria-expanded", String(Boolean(isOpen)));
+  button.classList.toggle("active-tool", Boolean(isOpen));
+  if (isOpen) updateSheetSizeControls();
+}
+
+function updateSheetSizeControls() {
+  const cellLabel = document.getElementById("sheetSizeCellLabel");
+  if (!cellLabel || !state.customSheet) return;
+
+  const parsed = parseCellKey(state.activeSheetCell || "A1") || { col: 1, row: 1 };
+  const letter = columnIndexToName(Math.min(Math.max(parsed.col, 1), state.customSheet.cols));
+  const row = Math.min(Math.max(parsed.row, 1), state.customSheet.rows);
+  const columnWidth = getSheetColumnWidth(letter);
+  const rowHeight = getSheetRowHeight(row);
+
+  cellLabel.textContent = `${letter}${row}`;
+  document.getElementById("sheetColumnLabel").textContent = letter;
+  document.getElementById("sheetRowLabel").textContent = String(row);
+
+  const columnInput = document.getElementById("sheetColumnWidth");
+  const rowInput = document.getElementById("sheetRowHeight");
+  columnInput.value = String(columnWidth);
+  rowInput.value = String(rowHeight);
+  document.getElementById("sheetColumnWidthValue").textContent = `${columnWidth} px`;
+  document.getElementById("sheetRowHeightValue").textContent = `${rowHeight} px`;
+}
+
+function updateSelectedSheetColumnWidth(event) {
+  const parsed = parseCellKey(state.activeSheetCell || "A1");
+  if (!parsed || !state.customSheet) return;
+  const letter = columnIndexToName(parsed.col);
+  setSheetColumnWidth(letter, event.target.value, true);
+}
+
+function updateSelectedSheetRowHeight(event) {
+  const parsed = parseCellKey(state.activeSheetCell || "A1");
+  if (!parsed || !state.customSheet) return;
+  setSheetRowHeight(parsed.row, event.target.value, true);
+}
+
+function setSheetColumnWidth(letter, value, shouldSave) {
+  if (!state.customSheet) return;
+  const width = clampNumber(value, SHEET_SIZE_LIMITS.minColumn, SHEET_SIZE_LIMITS.maxColumn);
+  if (!state.customSheet.columnWidths) state.customSheet.columnWidths = {};
+  state.customSheet.columnWidths[letter] = width;
+  applyRenderedSheetColumnWidth(letter, width);
+  updateRenderedSheetTableWidth();
+  updateSheetSizeControls();
+  if (shouldSave) scheduleCustomSheetSave();
+}
+
+function setSheetRowHeight(rowNumber, value, shouldSave) {
+  if (!state.customSheet) return;
+  const row = Math.min(Math.max(Number(rowNumber || 1), 1), state.customSheet.rows);
+  const height = clampNumber(value, SHEET_SIZE_LIMITS.minRow, SHEET_SIZE_LIMITS.maxRow);
+  if (!state.customSheet.rowHeights) state.customSheet.rowHeights = {};
+  state.customSheet.rowHeights[row] = height;
+  applyRenderedSheetRowHeight(row, height);
+  updateSheetSizeControls();
+  if (shouldSave) scheduleCustomSheetSave();
+}
+
+function applyRenderedSheetColumnWidth(letter, width) {
+  document.querySelectorAll(`#customSheetTable [data-sheet-column="${letter}"]`).forEach((element) => {
+    element.style.width = `${width}px`;
+    element.style.minWidth = `${width}px`;
+    element.style.maxWidth = `${width}px`;
+  });
+}
+
+function applyRenderedSheetRowHeight(rowNumber, height) {
+  const table = document.getElementById("customSheetTable");
+  const row = table.querySelector(`tbody tr[data-sheet-row="${rowNumber}"]`);
+  if (row) row.style.height = `${height}px`;
+
+  const rowHeader = table.querySelector(`tbody th[data-sheet-row-header="${rowNumber}"]`);
+  if (rowHeader) rowHeader.style.height = `${height}px`;
+
+  table.querySelectorAll(`tbody td[data-sheet-row="${rowNumber}"]`).forEach((cell) => {
+    cell.style.height = `${height}px`;
+    const wrap = cell.querySelector(".sheet-cell-wrap");
+    if (wrap) {
+      wrap.style.height = `${height}px`;
+      wrap.style.minHeight = `${height}px`;
+    }
+  });
+}
+
+function updateRenderedSheetTableWidth() {
+  if (!state.customSheet) return;
+  let totalWidth = 42;
+  for (let col = 1; col <= state.customSheet.cols; col += 1) {
+    totalWidth += getSheetColumnWidth(columnIndexToName(col));
+  }
+  document.getElementById("customSheetTable").style.width = `${totalWidth}px`;
+}
+
+async function applySelectedWidthToAllColumns() {
+  if (!state.customSheet) return;
+  const parsed = parseCellKey(state.activeSheetCell || "A1") || { col: 1 };
+  const width = getSheetColumnWidth(columnIndexToName(parsed.col));
+  state.customSheet.columnWidths = {};
+  for (let col = 1; col <= state.customSheet.cols; col += 1) {
+    state.customSheet.columnWidths[columnIndexToName(col)] = width;
+  }
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`All columns set to ${width} px.`);
+}
+
+async function applySelectedHeightToAllRows() {
+  if (!state.customSheet) return;
+  const parsed = parseCellKey(state.activeSheetCell || "A1") || { row: 1 };
+  const height = getSheetRowHeight(parsed.row);
+  state.customSheet.rowHeights = {};
+  for (let row = 1; row <= state.customSheet.rows; row += 1) {
+    state.customSheet.rowHeights[row] = height;
+  }
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`All rows set to ${height} px.`);
+}
+
+async function resetSelectedSheetSize() {
+  if (!state.customSheet) return;
+  const parsed = parseCellKey(state.activeSheetCell || "A1");
+  if (!parsed) return;
+  const letter = columnIndexToName(parsed.col);
+  delete state.customSheet.columnWidths?.[letter];
+  delete state.customSheet.rowHeights?.[parsed.row];
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`${letter}${parsed.row} row and column size reset.`);
+}
+
+async function resetAllSheetSizes() {
+  if (!state.customSheet) return;
+  state.customSheet.columnWidths = {};
+  state.customSheet.rowHeights = {};
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast("All row and column sizes reset.");
+}
+
+function handleSheetResizePointerDown(event) {
+  if (!state.customSheet || event.button > 0) return;
+  const columnHandle = event.target.closest?.("[data-resize-column]");
+  const rowHandle = event.target.closest?.("[data-resize-row]");
+  if (!columnHandle && !rowHandle) return;
+
+  event.preventDefault();
+  finishSheetResize();
+
+  if (columnHandle) {
+    const letter = columnHandle.dataset.resizeColumn;
+    const active = parseCellKey(state.activeSheetCell || "A1") || { row: 1 };
+    setActiveSheetCell(`${letter}${Math.min(active.row, state.customSheet.rows)}`, false);
+    state.sheetResize = {
+      type: "column",
+      key: letter,
+      pointerId: event.pointerId,
+      startPosition: event.clientX,
+      startSize: getSheetColumnWidth(letter),
+      target: columnHandle
+    };
+    document.body.classList.add("sheet-resizing-column");
+  } else {
+    const row = Number(rowHandle.dataset.resizeRow);
+    const active = parseCellKey(state.activeSheetCell || "A1") || { col: 1 };
+    setActiveSheetCell(`${columnIndexToName(Math.min(active.col, state.customSheet.cols))}${row}`, false);
+    state.sheetResize = {
+      type: "row",
+      key: row,
+      pointerId: event.pointerId,
+      startPosition: event.clientY,
+      startSize: getSheetRowHeight(row),
+      target: rowHandle
+    };
+    document.body.classList.add("sheet-resizing-row");
+  }
+
+  state.sheetResize.target.setPointerCapture?.(event.pointerId);
+  window.addEventListener("pointermove", handleSheetResizePointerMove, { passive: false });
+  window.addEventListener("pointerup", finishSheetResize);
+  window.addEventListener("pointercancel", finishSheetResize);
+}
+
+function handleSheetResizePointerMove(event) {
+  const resize = state.sheetResize;
+  if (!resize || event.pointerId !== resize.pointerId) return;
+  event.preventDefault();
+  const currentPosition = resize.type === "column" ? event.clientX : event.clientY;
+  const newSize = resize.startSize + currentPosition - resize.startPosition;
+
+  if (resize.type === "column") {
+    setSheetColumnWidth(resize.key, newSize, false);
+  } else {
+    setSheetRowHeight(resize.key, newSize, false);
+  }
+}
+
+function finishSheetResize(event) {
+  const resize = state.sheetResize;
+  if (event && resize && event.pointerId !== undefined && event.pointerId !== resize.pointerId) return;
+
+  window.removeEventListener("pointermove", handleSheetResizePointerMove);
+  window.removeEventListener("pointerup", finishSheetResize);
+  window.removeEventListener("pointercancel", finishSheetResize);
+  document.body.classList.remove("sheet-resizing-column", "sheet-resizing-row");
+
+  if (!resize) return;
+  try {
+    resize.target.releasePointerCapture?.(resize.pointerId);
+  } catch (_) {}
+  state.sheetResize = null;
+  saveCustomSheetNow().catch((error) => console.error("Unable to save sheet size:", error));
 }
 
 function updateSheetFormulaResults() {

@@ -1324,6 +1324,102 @@ html.ios-standalone .app-shell {
   font-size: 0.78rem;
 }
 
+.sheet-toolbar .active-tool {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.sheet-size-controls {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.sheet-size-controls[hidden] {
+  display: none;
+}
+
+.sheet-size-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sheet-size-heading div {
+  display: grid;
+  gap: 2px;
+}
+
+.sheet-size-heading span,
+.sheet-size-field > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.sheet-size-heading strong {
+  color: var(--primary-dark);
+  font-size: 1rem;
+}
+
+.sheet-size-heading .compact-button {
+  min-height: 36px;
+  padding: 7px 12px;
+}
+
+.sheet-size-field {
+  display: grid;
+  gap: 8px;
+}
+
+.sheet-size-field strong {
+  color: var(--text);
+}
+
+.sheet-range-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 10px;
+}
+
+.sheet-range-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--primary);
+  touch-action: pan-y;
+}
+
+.sheet-range-row output {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 850;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sheet-size-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sheet-size-actions .compact-button {
+  min-height: 40px;
+  padding: 8px 9px;
+  font-size: 0.72rem;
+}
+
 .formula-bar {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
@@ -1385,8 +1481,8 @@ html.ios-standalone .app-shell {
 }
 
 .custom-sheet-table {
-  width: max-content;
   min-width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.82rem;
@@ -1394,6 +1490,7 @@ html.ios-standalone .app-shell {
 
 .custom-sheet-table th,
 .custom-sheet-table td {
+  box-sizing: border-box;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
@@ -1402,6 +1499,8 @@ html.ios-standalone .app-shell {
 .custom-sheet-table tbody th {
   position: sticky;
   z-index: 2;
+  padding: 0;
+  overflow: visible;
   background: var(--surface);
   color: var(--muted);
   font-size: 0.74rem;
@@ -1411,7 +1510,6 @@ html.ios-standalone .app-shell {
 
 .custom-sheet-table thead th {
   top: 0;
-  min-width: 112px;
   height: 36px;
 }
 
@@ -1419,33 +1517,52 @@ html.ios-standalone .app-shell {
   left: 0;
   width: 42px;
   min-width: 42px;
+  max-width: 42px;
 }
 
 .custom-sheet-table .sheet-corner {
   left: 0;
-  z-index: 3;
+  z-index: 5;
   width: 42px;
   min-width: 42px;
+  max-width: 42px;
+}
+
+.sheet-heading-label {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 36px;
+  place-items: center;
+  pointer-events: none;
+}
+
+.custom-sheet-table tbody th .sheet-heading-label {
+  min-height: 100%;
 }
 
 .custom-sheet-table td {
-  min-width: 112px;
-  width: 112px;
+  padding: 0;
+  overflow: hidden;
   background: var(--surface);
+  vertical-align: top;
 }
 
 .sheet-cell-wrap {
   display: grid;
+  align-content: center;
   gap: 2px;
   min-height: 56px;
   padding: 5px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .sheet-cell-input {
   width: 100%;
   min-width: 0;
-  min-height: 32px;
-  padding: 5px 6px;
+  min-height: 30px;
+  padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
@@ -1467,25 +1584,180 @@ html.ios-standalone .app-shell {
 }
 
 .sheet-cell-result {
-  min-height: 15px;
+  min-height: 13px;
   color: var(--primary-dark);
   font-size: 0.68rem;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.15;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.sheet-resize-handle {
+  position: absolute;
+  z-index: 8;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sheet-column-resize-handle {
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.sheet-row-resize-handle {
+  right: 0;
+  bottom: -6px;
+  width: 100%;
+  height: 12px;
+  cursor: row-resize;
+}
+
+.sheet-column-resize-handle::after,
+.sheet-row-resize-handle::after {
+  position: absolute;
+  content: "";
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0.28;
+  transition: opacity 120ms ease;
+}
+
+.sheet-column-resize-handle::after {
+  top: 6px;
+  right: 5px;
+  bottom: 6px;
+  width: 2px;
+}
+
+.sheet-row-resize-handle::after {
+  right: 6px;
+  bottom: 5px;
+  left: 6px;
+  height: 2px;
+}
+
+.custom-sheet-table th:hover .sheet-resize-handle::after,
+.sheet-resize-handle:active::after {
+  opacity: 0.9;
+}
+
+body.sheet-resizing-column,
+body.sheet-resizing-column * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+body.sheet-resizing-row,
+body.sheet-resizing-row * {
+  cursor: row-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
 @media (min-width: 620px) {
   .sheet-toolbar {
-    grid-template-columns: repeat(5, auto);
-    justify-content: start;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
-  .custom-sheet-table thead th,
-  .custom-sheet-table td {
-    min-width: 126px;
-    width: 126px;
+  .sheet-size-controls {
+    max-width: 720px;
   }
+
+  .sheet-size-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+@media (pointer: coarse) {
+  .sheet-column-resize-handle {
+    right: -8px;
+    width: 16px;
+  }
+
+  .sheet-row-resize-handle {
+    bottom: -8px;
+    height: 16px;
+  }
+
+  .sheet-column-resize-handle::after,
+  .sheet-row-resize-handle::after {
+    opacity: 0.42;
+  }
+}
+
+
+/* V13: cleaner sheet alignment and setup-only salary cycle */
+.setup-cycle-strip {
+  margin: 0 0 14px;
+}
+
+.custom-sheet-table tbody th {
+  vertical-align: middle;
+}
+
+.sheet-heading-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.custom-sheet-table thead .sheet-heading-label {
+  min-height: 36px;
+}
+
+.custom-sheet-table tbody th .sheet-heading-label {
+  height: 100%;
+  min-height: 0;
+}
+
+.sheet-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.sheet-cell-input {
+  display: block;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.sheet-cell-result:empty {
+  display: none;
+}
+
+/* On phones/tablets, resize through the Cell size panel instead of showing drag guides. */
+@media (pointer: coarse) {
+  .sheet-resize-handle {
+    display: none;
+  }
+}
+
+
+.setup-cycle-strip .cycle-mode-note {
+  margin-top: 4px;
+  max-width: none;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1.35;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
 }

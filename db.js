@@ -230,6 +230,8 @@ const BudgetDB = (() => {
       cols: 6,
       headerRow: true,
       cells: {},
+      columnWidths: {},
+      rowHeights: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -254,6 +256,8 @@ const BudgetDB = (() => {
       rows: Math.max(1, Number(sheet.rows || 20)),
       cols: Math.max(1, Number(sheet.cols || 6)),
       cells: sheet.cells || {},
+      columnWidths: sheet.columnWidths && typeof sheet.columnWidths === "object" ? sheet.columnWidths : {},
+      rowHeights: sheet.rowHeights && typeof sheet.rowHeights === "object" ? sheet.rowHeights : {},
       updatedAt: new Date().toISOString()
     });
     await done;
@@ -285,7 +289,7 @@ const BudgetDB = (() => {
 
     return {
       app: "Pocket Budget",
-      version: 3,
+      version: 4,
       exportedAt: new Date().toISOString(),
       months,
       transactions,
