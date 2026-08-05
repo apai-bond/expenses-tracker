@@ -1219,3 +1219,273 @@ html.ios-standalone .app-shell {
     font-size: 0.9rem;
   }
 }
+
+/* V10: iPhone Safari date picker width correction.
+   iOS gives date inputs an intrinsic inline size that can exceed a grid cell.
+   Resetting the native appearance keeps the input inside the panel while the
+   control still opens the normal iPhone date picker when tapped. */
+.date-field {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.date-field input[type="date"] {
+  display: block;
+  box-sizing: border-box;
+  inline-size: 100%;
+  width: 100%;
+  min-inline-size: 0;
+  min-width: 0;
+  max-inline-size: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding-inline: 12px;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+.date-field input[type="date"]::-webkit-date-and-time-value {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.date-field input[type="date"]::-webkit-datetime-edit {
+  min-width: 0;
+  padding: 0;
+}
+
+@media (max-width: 480px) {
+  .date-field input[type="date"] {
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* V11: Custom free spreadsheet tab */
+.bottom-nav {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+@media (max-width: 480px) {
+  .bottom-nav {
+    min-height: 74px;
+    padding: 6px;
+    border-radius: 21px;
+  }
+
+  .nav-button {
+    gap: 3px;
+    padding: 5px 2px;
+    font-size: 0.62rem;
+    border-radius: 15px;
+  }
+
+  .nav-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .nav-icon svg,
+  .add-nav-button .nav-icon svg {
+    width: 21px;
+    height: 21px;
+  }
+}
+
+.sheet-panel {
+  padding: 16px;
+}
+
+.sheet-title-row {
+  align-items: flex-start;
+}
+
+.sheet-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sheet-toolbar .compact-button {
+  min-height: 42px;
+  padding-inline: 10px;
+  font-size: 0.78rem;
+}
+
+.formula-bar {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+
+.formula-bar span {
+  display: grid;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--primary-dark);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.formula-bar input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  outline: none;
+  font-size: 16px;
+}
+
+.formula-bar input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.sheet-help {
+  margin-top: 12px;
+}
+
+.sheet-help strong {
+  color: var(--text);
+}
+
+.sheet-scroll {
+  width: 100%;
+  margin-top: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface-soft);
+  -webkit-overflow-scrolling: touch;
+}
+
+.custom-sheet-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+}
+
+.custom-sheet-table th,
+.custom-sheet-table td {
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.custom-sheet-table thead th,
+.custom-sheet-table tbody th {
+  position: sticky;
+  z-index: 2;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.custom-sheet-table thead th {
+  top: 0;
+  min-width: 112px;
+  height: 36px;
+}
+
+.custom-sheet-table tbody th {
+  left: 0;
+  width: 42px;
+  min-width: 42px;
+}
+
+.custom-sheet-table .sheet-corner {
+  left: 0;
+  z-index: 3;
+  width: 42px;
+  min-width: 42px;
+}
+
+.custom-sheet-table td {
+  min-width: 112px;
+  width: 112px;
+  background: var(--surface);
+}
+
+.sheet-cell-wrap {
+  display: grid;
+  gap: 2px;
+  min-height: 56px;
+  padding: 5px;
+}
+
+.sheet-cell-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 5px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  outline: none;
+  font-size: 16px;
+}
+
+.sheet-cell-input:focus,
+.sheet-cell-input.active {
+  border-color: var(--primary);
+  background: var(--surface-soft);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.sheet-table-header-cell .sheet-cell-input {
+  color: var(--primary-dark);
+  font-weight: 850;
+}
+
+.sheet-cell-result {
+  min-height: 15px;
+  color: var(--primary-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 620px) {
+  .sheet-toolbar {
+    grid-template-columns: repeat(5, auto);
+    justify-content: start;
+  }
+
+  .custom-sheet-table thead th,
+  .custom-sheet-table td {
+    min-width: 126px;
+    width: 126px;
+  }
+}

@@ -24,14 +24,14 @@
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest?v=9">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=9">
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=9">
-  <link rel="stylesheet" href="styles.css?v=9">
+  <link rel="manifest" href="manifest.webmanifest?v=11">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=11">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=11">
+  <link rel="stylesheet" href="styles.css?v=11">
 
-  <script src="cycle.js?v=9" defer></script>
-  <script src="db.js?v=9" defer></script>
-  <script src="app.js?v=9" defer></script>
+  <script src="cycle.js?v=11" defer></script>
+  <script src="db.js?v=11" defer></script>
+  <script src="app.js?v=11" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -212,7 +212,7 @@
           </label>
 
           <div class="field-grid">
-            <label class="field">
+            <label class="field date-field">
               <span>Date</span>
               <input id="transactionDate" type="date" required>
             </label>
@@ -234,6 +234,49 @@
         </form>
       </section>
 
+
+      <section id="sheetView" class="view" aria-label="Custom sheet">
+        <div class="page-heading sheet-heading">
+          <div>
+            <p class="section-kicker">FREE RECORD</p>
+            <h2>Custom sheet</h2>
+            <p class="page-context">Use this empty spreadsheet for any record that is not directly related to expenses.</p>
+          </div>
+          <span id="sheetSizeBadge" class="count-badge">0 cells</span>
+        </div>
+
+        <section class="panel sheet-panel">
+          <div class="panel-heading sheet-title-row">
+            <div>
+              <p class="section-kicker">TABLE</p>
+              <h2 id="customSheetTitle">Quick table</h2>
+            </div>
+          </div>
+
+          <div class="sheet-toolbar" aria-label="Spreadsheet tools">
+            <button id="sheetAddRowButton" class="secondary-button compact-button" type="button">Add row</button>
+            <button id="sheetAddColumnButton" class="secondary-button compact-button" type="button">Add column</button>
+            <button id="sheetHeaderButton" class="secondary-button compact-button" type="button">Header row</button>
+            <button id="sheetExportButton" class="secondary-button compact-button" type="button">Export CSV</button>
+            <button id="sheetClearButton" class="danger-button compact-button" type="button">Clear</button>
+          </div>
+
+          <div class="formula-bar" aria-label="Formula bar">
+            <span id="activeCellLabel">A1</span>
+            <input id="formulaInput" type="text" placeholder="Select a cell or type formula, e.g. =SUM(B2:B10)">
+          </div>
+
+          <p class="form-help sheet-help">
+            Formula examples: <strong>=SUM(B2:B10)</strong>, <strong>=AVG(C2:C8)</strong>, <strong>=A2+B2</strong>.
+            The first row can be used as table headers.
+          </p>
+
+          <div class="sheet-scroll" aria-label="Editable spreadsheet">
+            <table id="customSheetTable" class="custom-sheet-table"></table>
+          </div>
+        </section>
+      </section>
+
       <section id="settingsView" class="view" aria-label="Settings">
         <div class="page-heading">
           <div>
@@ -245,7 +288,7 @@
         <form id="monthSetupForm" class="panel form-panel">
           <p class="form-help">These values apply to the <strong id="setupMonthName">selected month</strong> budget.</p>
 
-          <label class="field">
+          <label class="field date-field">
             <span>Salary received / cycle start date</span>
             <input id="cycleStartDate" type="date" required>
             <small class="field-help">
@@ -349,6 +392,18 @@
           </svg>
         </span>
         <span>Add</span>
+      </button>
+      <button class="nav-button" type="button" data-view="sheet" aria-label="Custom sheet">
+        <span class="nav-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+            <path d="M4 10h16"></path>
+            <path d="M4 16h16"></path>
+            <path d="M10 4v16"></path>
+            <path d="M16 4v16"></path>
+          </svg>
+        </span>
+        <span>Sheet</span>
       </button>
       <button class="nav-button" type="button" data-view="settings" aria-label="Setup">
         <span class="nav-icon" aria-hidden="true">

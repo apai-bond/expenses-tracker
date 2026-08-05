@@ -110,3 +110,7 @@ Start in `calculations.py`. It calculates:
 - saving-target progress
 - average daily spending based on elapsed salary-cycle days
 - expense totals by category
+
+## Version 10 - iPhone date picker fit
+
+The transaction date and salary-cycle start date are constrained to the form width on iPhone Safari. The fix preserves the native iPhone date picker and does not change existing IndexedDB records.

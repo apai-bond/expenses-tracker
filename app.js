@@ -8,6 +8,9 @@ const state = {
   cycle: null,
   transactions: [],
   categories: [],
+  customSheet: null,
+  activeSheetCell: "A1",
+  sheetSaveTimer: null,
   python: null,
   pythonReady: false,
   toastTimer: null
@@ -98,7 +101,21 @@ function bindEvents() {
   document.getElementById("importFile").addEventListener("change", importBackup);
   document.getElementById("resetButton").addEventListener("click", resetAllData);
 
-  window.addEventListener("resize", debounce(() => renderDashboard(), 150));
+  document.getElementById("sheetAddRowButton").addEventListener("click", addCustomSheetRow);
+  document.getElementById("sheetAddColumnButton").addEventListener("click", addCustomSheetColumn);
+  document.getElementById("sheetHeaderButton").addEventListener("click", toggleCustomSheetHeader);
+  document.getElementById("sheetExportButton").addEventListener("click", exportCustomSheetCsv);
+  document.getElementById("sheetClearButton").addEventListener("click", clearCustomSheetData);
+  document.getElementById("formulaInput").addEventListener("input", updateActiveCellFromFormulaBar);
+
+  const sheetTable = document.getElementById("customSheetTable");
+  sheetTable.addEventListener("focusin", handleSheetCellFocus);
+  sheetTable.addEventListener("input", handleSheetCellInput);
+
+  window.addEventListener("resize", debounce(() => {
+    renderDashboard();
+    if (state.currentView === "sheet") renderCustomSheet();
+  }, 150));
 }
 
 function initializeTheme() {
@@ -176,7 +193,7 @@ async function loadPythonEngine() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.3/full/"
     });
 
-    const response = await fetch("calculations.py?v=8", { cache: "no-cache" });
+    const response = await fetch("calculations.py?v=11", { cache: "no-cache" });
     if (!response.ok) {
       throw new Error("Could not load calculations.py");
     }
@@ -195,10 +212,11 @@ async function loadPythonEngine() {
 
 async function refreshAll() {
   const nextMonth = BudgetCycle.addMonths(state.currentMonth, 1);
-  const [monthRecord, nextMonthRecord, categories] = await Promise.all([
+  const [monthRecord, nextMonthRecord, categories, customSheet] = await Promise.all([
     BudgetDB.getMonth(state.currentMonth),
     BudgetDB.getMonth(nextMonth),
-    BudgetDB.getAllCategories()
+    BudgetDB.getAllCategories(),
+    BudgetDB.getCustomSheet()
   ]);
 
   const cycle = BudgetCycle.getRange(state.currentMonth, monthRecord, nextMonthRecord);
@@ -213,6 +231,7 @@ async function refreshAll() {
   state.cycle = cycle;
   state.transactions = transactions;
   state.categories = categories;
+  state.customSheet = normaliseCustomSheet(customSheet);
 
   renderCycleInformation();
   populateMonthSetup();
@@ -220,11 +239,12 @@ async function refreshAll() {
   renderCategoryOptions();
   renderCategoryList();
   renderAllTransactions();
+  renderCustomSheet();
   renderDashboard();
 }
 
 function showView(viewName) {
-  const validViews = ["home", "transactions", "add", "settings"];
+  const validViews = ["home", "transactions", "add", "sheet", "settings"];
   const nextView = validViews.includes(viewName) ? viewName : "home";
   state.currentView = nextView;
 
@@ -243,6 +263,7 @@ function showView(viewName) {
 
   if (nextView === "home") renderDashboard();
   if (nextView === "transactions") renderAllTransactions();
+  if (nextView === "sheet") renderCustomSheet();
   if (nextView === "settings") populateMonthSetup();
 
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -822,7 +843,7 @@ async function importBackup(event) {
 }
 
 async function resetAllData() {
-  const confirmed = window.confirm("Delete every month, transaction, and custom category from this browser?");
+  const confirmed = window.confirm("Delete every month, transaction, custom category, and custom sheet from this browser?");
   if (!confirmed) return;
 
   await BudgetDB.clearAll();
@@ -830,8 +851,323 @@ async function resetAllData() {
   document.getElementById("monthPicker").value = state.currentMonth;
   await refreshAll();
   resetTransactionForm();
+
   showToast("All test data deleted.");
   showView("home");
+}
+
+function normaliseCustomSheet(sheet) {
+  const source = sheet || {};
+  const rows = Math.min(Math.max(Number(source.rows || 20), 1), 120);
+  const cols = Math.min(Math.max(Number(source.cols || 6), 1), 18);
+  return {
+    id: source.id || "main",
+    name: source.name || "Quick table",
+    rows,
+    cols,
+    headerRow: source.headerRow !== false,
+    cells: source.cells && typeof source.cells === "object" ? { ...source.cells } : {},
+    createdAt: source.createdAt || new Date().toISOString(),
+    updatedAt: source.updatedAt || new Date().toISOString()
+  };
+}
+
+function renderCustomSheet() {
+  if (!state.customSheet) return;
+
+  const sheet = normaliseCustomSheet(state.customSheet);
+  state.customSheet = sheet;
+
+  document.getElementById("customSheetTitle").textContent = sheet.name;
+  document.getElementById("sheetSizeBadge").textContent = `${sheet.rows} x ${sheet.cols}`;
+  document.getElementById("sheetHeaderButton").textContent = sheet.headerRow ? "Header on" : "Header off";
+
+  const table = document.getElementById("customSheetTable");
+  const columnHeaders = Array.from({ length: sheet.cols }, (_, index) => columnIndexToName(index + 1));
+
+  const headerHtml = `
+    <thead>
+      <tr>
+        <th class="sheet-corner" aria-label="Cell coordinates"></th>
+        ${columnHeaders.map((letter) => `<th scope="col">${letter}</th>`).join("")}
+      </tr>
+    </thead>`;
+
+  const bodyHtml = Array.from({ length: sheet.rows }, (_, rowIndex) => {
+    const rowNumber = rowIndex + 1;
+    const isHeaderRow = sheet.headerRow && rowNumber === 1;
+    const cells = columnHeaders.map((letter) => {
+      const key = `${letter}${rowNumber}`;
+      const rawValue = getSheetRawValue(key);
+      const result = rawValue.trim().startsWith("=") ? formatSheetResult(evaluateSheetCell(key)) : "";
+      return `
+        <td class="${isHeaderRow ? "sheet-table-header-cell" : ""}">
+          <div class="sheet-cell-wrap">
+            <input class="sheet-cell-input" data-cell="${key}" value="${escapeHtml(rawValue)}" placeholder="${isHeaderRow ? "Header" : ""}" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cell ${key}">
+            <small class="sheet-cell-result" data-result-cell="${key}">${result ? `= ${escapeHtml(result)}` : ""}</small>
+          </div>
+        </td>`;
+    }).join("");
+    return `<tr><th scope="row">${rowNumber}</th>${cells}</tr>`;
+  }).join("");
+
+  table.innerHTML = `${headerHtml}<tbody>${bodyHtml}</tbody>`;
+  setActiveSheetCell(state.activeSheetCell || "A1", false);
+}
+
+function handleSheetCellFocus(event) {
+  const input = event.target.closest?.(".sheet-cell-input");
+  if (!input) return;
+  setActiveSheetCell(input.dataset.cell, true);
+}
+
+function handleSheetCellInput(event) {
+  const input = event.target.closest?.(".sheet-cell-input");
+  if (!input) return;
+
+  setSheetRawValue(input.dataset.cell, input.value);
+  if (state.activeSheetCell === input.dataset.cell) {
+    document.getElementById("formulaInput").value = input.value;
+  }
+  updateSheetFormulaResults();
+  scheduleCustomSheetSave();
+}
+
+function setActiveSheetCell(cellKey, syncFormula) {
+  if (!cellKey) return;
+  state.activeSheetCell = cellKey;
+  document.getElementById("activeCellLabel").textContent = cellKey;
+  document.querySelectorAll(".sheet-cell-input.active").forEach((input) => input.classList.remove("active"));
+  const activeInput = document.querySelector(`.sheet-cell-input[data-cell="${cellKey}"]`);
+  if (activeInput) activeInput.classList.add("active");
+  if (syncFormula) document.getElementById("formulaInput").value = getSheetRawValue(cellKey);
+}
+
+function updateActiveCellFromFormulaBar(event) {
+  if (!state.activeSheetCell) return;
+  const value = event.target.value;
+  setSheetRawValue(state.activeSheetCell, value);
+  const activeInput = document.querySelector(`.sheet-cell-input[data-cell="${state.activeSheetCell}"]`);
+  if (activeInput) activeInput.value = value;
+  updateSheetFormulaResults();
+  scheduleCustomSheetSave();
+}
+
+function getSheetRawValue(cellKey) {
+  return String(state.customSheet?.cells?.[cellKey] ?? "");
+}
+
+function setSheetRawValue(cellKey, value) {
+  if (!state.customSheet) return;
+  if (!state.customSheet.cells) state.customSheet.cells = {};
+  const text = String(value ?? "");
+  if (text.trim() === "") {
+    delete state.customSheet.cells[cellKey];
+  } else {
+    state.customSheet.cells[cellKey] = text;
+  }
+}
+
+function updateSheetFormulaResults() {
+  document.querySelectorAll(".sheet-cell-result[data-result-cell]").forEach((element) => {
+    const cellKey = element.dataset.resultCell;
+    const rawValue = getSheetRawValue(cellKey);
+    if (!rawValue.trim().startsWith("=")) {
+      element.textContent = "";
+      return;
+    }
+    element.textContent = `= ${formatSheetResult(evaluateSheetCell(cellKey))}`;
+  });
+}
+
+function scheduleCustomSheetSave() {
+  clearTimeout(state.sheetSaveTimer);
+  state.sheetSaveTimer = setTimeout(() => saveCustomSheetNow(), 350);
+}
+
+async function saveCustomSheetNow() {
+  if (!state.customSheet) return;
+  await BudgetDB.saveCustomSheet(state.customSheet);
+}
+
+async function addCustomSheetRow() {
+  if (!state.customSheet) return;
+  state.customSheet.rows = Math.min(Number(state.customSheet.rows || 20) + 1, 120);
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast("Row added.");
+}
+
+async function addCustomSheetColumn() {
+  if (!state.customSheet) return;
+  state.customSheet.cols = Math.min(Number(state.customSheet.cols || 6) + 1, 18);
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast("Column added.");
+}
+
+async function toggleCustomSheetHeader() {
+  if (!state.customSheet) return;
+  state.customSheet.headerRow = !state.customSheet.headerRow;
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(state.customSheet.headerRow ? "Header row enabled." : "Header row disabled.");
+}
+
+async function clearCustomSheetData() {
+  const confirmed = window.confirm("Clear every cell in the custom sheet?");
+  if (!confirmed) return;
+
+  await BudgetDB.clearCustomSheet();
+  state.customSheet = await BudgetDB.getCustomSheet();
+  renderCustomSheet();
+  showToast("Custom sheet cleared.");
+}
+
+function exportCustomSheetCsv() {
+  if (!state.customSheet) return;
+
+  const rows = [];
+  for (let row = 1; row <= state.customSheet.rows; row += 1) {
+    const values = [];
+    for (let col = 1; col <= state.customSheet.cols; col += 1) {
+      const key = `${columnIndexToName(col)}${row}`;
+      const rawValue = getSheetRawValue(key);
+      const output = rawValue.trim().startsWith("=") ? formatSheetResult(evaluateSheetCell(key)) : rawValue;
+      values.push(csvEscape(output));
+    }
+    rows.push(values.join(","));
+  }
+
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `pocket-budget-custom-sheet-${getLocalDate(new Date())}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast("Custom sheet CSV exported.");
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function evaluateSheetCell(cellKey, visited = new Set()) {
+  const rawValue = getSheetRawValue(cellKey).trim();
+  if (!rawValue.startsWith("=")) return parseSheetNumber(rawValue);
+  if (visited.has(cellKey)) return "#CYCLE";
+  visited.add(cellKey);
+  const result = evaluateSheetFormula(rawValue, visited);
+  visited.delete(cellKey);
+  return result;
+}
+
+function evaluateSheetFormula(rawFormula, visited) {
+  let expression = String(rawFormula || "").slice(1).trim().toUpperCase();
+  if (!expression) return "";
+
+  try {
+    expression = expression.replace(/\b(SUM|AVG|MIN|MAX|COUNT)\(([^()]+)\)/g, (_match, functionName, argumentText) => {
+      const values = collectSheetFormulaValues(argumentText, visited);
+      if (functionName === "COUNT") return String(values.filter((item) => Number.isFinite(item)).length);
+      const numericValues = values.filter((item) => Number.isFinite(item));
+      if (!numericValues.length) return "0";
+      if (functionName === "SUM") return String(numericValues.reduce((sum, value) => sum + value, 0));
+      if (functionName === "AVG") return String(numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length);
+      if (functionName === "MIN") return String(Math.min(...numericValues));
+      if (functionName === "MAX") return String(Math.max(...numericValues));
+      return "0";
+    });
+
+    expression = expression.replace(/\b([A-Z]{1,3}[1-9]\d*)\b/g, (_match, reference) => {
+      const value = evaluateSheetCell(reference, visited);
+      return Number.isFinite(value) ? String(value) : "0";
+    });
+
+    if (/[^0-9+\-*/().\s]/.test(expression)) return "#ERR";
+    const result = Function(`"use strict"; return (${expression});`)();
+    return Number.isFinite(result) ? result : "#ERR";
+  } catch (error) {
+    return "#ERR";
+  }
+}
+
+function collectSheetFormulaValues(argumentText, visited) {
+  return String(argumentText || "")
+    .split(",")
+    .flatMap((part) => {
+      const token = part.trim().toUpperCase();
+      if (!token) return [];
+      const rangeMatch = token.match(/^([A-Z]{1,3}[1-9]\d*):([A-Z]{1,3}[1-9]\d*)$/);
+      if (rangeMatch) return expandSheetRange(rangeMatch[1], rangeMatch[2]).map((key) => evaluateSheetCell(key, visited));
+      const cellMatch = token.match(/^([A-Z]{1,3}[1-9]\d*)$/);
+      if (cellMatch) return [evaluateSheetCell(cellMatch[1], visited)];
+      const directNumber = parseSheetNumber(token);
+      return Number.isFinite(directNumber) ? [directNumber] : [];
+    });
+}
+
+function expandSheetRange(startKey, endKey) {
+  const start = parseCellKey(startKey);
+  const end = parseCellKey(endKey);
+  if (!start || !end) return [];
+
+  const minRow = Math.min(start.row, end.row);
+  const maxRow = Math.max(start.row, end.row);
+  const minCol = Math.min(start.col, end.col);
+  const maxCol = Math.max(start.col, end.col);
+  const cells = [];
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      cells.push(`${columnIndexToName(col)}${row}`);
+    }
+  }
+  return cells;
+}
+
+function parseCellKey(cellKey) {
+  const match = String(cellKey || "").toUpperCase().match(/^([A-Z]{1,3})([1-9]\d*)$/);
+  if (!match) return null;
+  return {
+    col: columnNameToIndex(match[1]),
+    row: Number(match[2])
+  };
+}
+
+function columnIndexToName(index) {
+  let number = Number(index);
+  let name = "";
+  while (number > 0) {
+    const remainder = (number - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    number = Math.floor((number - 1) / 26);
+  }
+  return name || "A";
+}
+
+function columnNameToIndex(name) {
+  return String(name || "A").toUpperCase().split("").reduce((total, char) => {
+    return total * 26 + char.charCodeAt(0) - 64;
+  }, 0);
+}
+
+function parseSheetNumber(value) {
+  const cleaned = String(value ?? "").replace(/,/g, "").trim();
+  if (!cleaned) return 0;
+  const number = Number(cleaned);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatSheetResult(value) {
+  if (typeof value === "string") return value;
+  if (!Number.isFinite(value)) return "#ERR";
+  return new Intl.NumberFormat("en-MY", {
+    maximumFractionDigits: 4
+  }).format(value);
 }
 
 function loadExternalScript(url) {

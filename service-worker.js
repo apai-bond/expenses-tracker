@@ -1,21 +1,21 @@
 "use strict";
 
-const CACHE_NAME = "pocket-budget-v9-iphone-layout";
+const CACHE_NAME = "pocket-budget-v11-custom-sheet";
 const LOCAL_ASSETS = [
   "./",
   "index.html",
-  "styles.css?v=9",
-  "cycle.js?v=9",
-  "db.js?v=9",
-  "app.js?v=9",
-  "calculations.py?v=9",
-  "manifest.webmanifest?v=9",
-  "icons/icon-192.png?v=9",
-  "icons/icon-512.png?v=9",
-  "icons/icon-1024.png?v=9",
-  "icons/apple-touch-icon.png?v=9",
-  "icons/favicon.svg?v=9",
-  "icons/app-icon.svg?v=9"
+  "styles.css?v=11",
+  "cycle.js?v=11",
+  "db.js?v=11",
+  "app.js?v=11",
+  "calculations.py?v=11",
+  "manifest.webmanifest?v=11",
+  "icons/icon-192.png?v=11",
+  "icons/icon-512.png?v=11",
+  "icons/icon-1024.png?v=11",
+  "icons/apple-touch-icon.png?v=11",
+  "icons/favicon.svg?v=11",
+  "icons/app-icon.svg?v=11"
 ];
 
 self.addEventListener("install", (event) => {

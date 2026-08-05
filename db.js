@@ -2,7 +2,7 @@
 
 const BudgetDB = (() => {
   const DB_NAME = "PocketBudgetDB";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   let dbPromise;
 
   const DEFAULT_CATEGORIES = [
@@ -58,6 +58,10 @@ const BudgetDB = (() => {
         if (!db.objectStoreNames.contains("categories")) {
           const store = db.createObjectStore("categories", { keyPath: "id" });
           store.createIndex("type", "type", { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains("customSheets")) {
+          db.createObjectStore("customSheets", { keyPath: "id" });
         }
       };
 
@@ -216,27 +220,77 @@ const BudgetDB = (() => {
     await done;
   }
 
+
+
+  function defaultCustomSheet() {
+    return {
+      id: "main",
+      name: "Quick table",
+      rows: 20,
+      cols: 6,
+      headerRow: true,
+      cells: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  async function getCustomSheet(id = "main") {
+    const db = await open();
+    const tx = db.transaction("customSheets", "readonly");
+    const done = transactionDone(tx);
+    const result = await requestToPromise(tx.objectStore("customSheets").get(id));
+    await done;
+    return result || defaultCustomSheet();
+  }
+
+  async function saveCustomSheet(sheet) {
+    const db = await open();
+    const tx = db.transaction("customSheets", "readwrite");
+    const done = transactionDone(tx);
+    tx.objectStore("customSheets").put({
+      ...defaultCustomSheet(),
+      ...sheet,
+      rows: Math.max(1, Number(sheet.rows || 20)),
+      cols: Math.max(1, Number(sheet.cols || 6)),
+      cells: sheet.cells || {},
+      updatedAt: new Date().toISOString()
+    });
+    await done;
+  }
+
+  async function clearCustomSheet(id = "main") {
+    await saveCustomSheet({
+      ...defaultCustomSheet(),
+      id,
+      createdAt: new Date().toISOString()
+    });
+  }
+
   async function exportData() {
     const db = await open();
-    const tx = db.transaction(["months", "transactions", "categories"], "readonly");
+    const tx = db.transaction(["months", "transactions", "categories", "customSheets"], "readonly");
     const done = transactionDone(tx);
     const monthRequest = tx.objectStore("months").getAll();
     const transactionRequest = tx.objectStore("transactions").getAll();
     const categoryRequest = tx.objectStore("categories").getAll();
-    const [months, transactions, categories] = await Promise.all([
+    const customSheetRequest = tx.objectStore("customSheets").getAll();
+    const [months, transactions, categories, customSheets] = await Promise.all([
       requestToPromise(monthRequest),
       requestToPromise(transactionRequest),
-      requestToPromise(categoryRequest)
+      requestToPromise(categoryRequest),
+      requestToPromise(customSheetRequest)
     ]);
     await done;
 
     return {
       app: "Pocket Budget",
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       months,
       transactions,
-      categories
+      categories,
+      customSheets
     };
   }
 
@@ -246,19 +300,22 @@ const BudgetDB = (() => {
     }
 
     const db = await open();
-    const tx = db.transaction(["months", "transactions", "categories"], "readwrite");
+    const tx = db.transaction(["months", "transactions", "categories", "customSheets"], "readwrite");
     const done = transactionDone(tx);
     const monthStore = tx.objectStore("months");
     const transactionStore = tx.objectStore("transactions");
     const categoryStore = tx.objectStore("categories");
+    const customSheetStore = tx.objectStore("customSheets");
 
     monthStore.clear();
     transactionStore.clear();
     categoryStore.clear();
+    customSheetStore.clear();
 
     data.months.forEach((record) => monthStore.put(record));
     data.transactions.forEach((record) => transactionStore.put(record));
     data.categories.forEach((record) => categoryStore.put(record));
+    (Array.isArray(data.customSheets) ? data.customSheets : []).forEach((record) => customSheetStore.put(record));
 
     await done;
     if (data.categories.length === 0) await initialize();
@@ -266,11 +323,12 @@ const BudgetDB = (() => {
 
   async function clearAll() {
     const db = await open();
-    const tx = db.transaction(["months", "transactions", "categories"], "readwrite");
+    const tx = db.transaction(["months", "transactions", "categories", "customSheets"], "readwrite");
     const done = transactionDone(tx);
     tx.objectStore("months").clear();
     tx.objectStore("transactions").clear();
     tx.objectStore("categories").clear();
+    tx.objectStore("customSheets").clear();
     await done;
     await initialize();
   }
@@ -287,6 +345,9 @@ const BudgetDB = (() => {
     getAllCategories,
     addCategory,
     deleteCategory,
+    getCustomSheet,
+    saveCustomSheet,
+    clearCustomSheet,
     exportData,
     importData,
     clearAll
