@@ -1,21 +1,21 @@
 "use strict";
 
-const CACHE_NAME = "pocket-budget-v13-layout-cleanup";
+const CACHE_NAME = "pocket-budget-v14-cell-count-removed";
 const LOCAL_ASSETS = [
   "./",
   "index.html",
-  "styles.css?v=13",
-  "cycle.js?v=13",
-  "db.js?v=13",
-  "app.js?v=13",
-  "calculations.py?v=13",
-  "manifest.webmanifest?v=13",
-  "icons/icon-192.png?v=13",
-  "icons/icon-512.png?v=13",
-  "icons/icon-1024.png?v=13",
-  "icons/apple-touch-icon.png?v=13",
-  "icons/favicon.svg?v=13",
-  "icons/app-icon.svg?v=13"
+  "styles.css?v=14",
+  "cycle.js?v=14",
+  "db.js?v=14",
+  "app.js?v=14",
+  "calculations.py?v=14",
+  "manifest.webmanifest?v=14",
+  "icons/icon-192.png?v=14",
+  "icons/icon-512.png?v=14",
+  "icons/icon-1024.png?v=14",
+  "icons/apple-touch-icon.png?v=14",
+  "icons/favicon.svg?v=14",
+  "icons/app-icon.svg?v=14"
 ];
 
 self.addEventListener("install", (event) => {

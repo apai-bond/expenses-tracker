@@ -213,7 +213,7 @@ async function loadPythonEngine() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.3/full/"
     });
 
-    const response = await fetch("calculations.py?v=11", { cache: "no-cache" });
+    const response = await fetch("calculations.py?v=14", { cache: "no-cache" });
     if (!response.ok) {
       throw new Error("Could not load calculations.py");
     }
@@ -924,7 +924,6 @@ function renderCustomSheet() {
   }
 
   document.getElementById("customSheetTitle").textContent = sheet.name;
-  document.getElementById("sheetSizeBadge").textContent = `${sheet.rows} x ${sheet.cols}`;
   document.getElementById("sheetHeaderButton").textContent = sheet.headerRow ? "Header on" : "Header off";
 
   const table = document.getElementById("customSheetTable");

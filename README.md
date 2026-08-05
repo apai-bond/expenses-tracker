@@ -114,3 +114,14 @@ Start in `calculations.py`. It calculates:
 ## Version 10 - iPhone date picker fit
 
 The transaction date and salary-cycle start date are constrained to the form width on iPhone Safari. The fix preserves the native iPhone date picker and does not change existing IndexedDB records.
+
+## Version 12: adjustable Custom Sheet sizes
+
+The Custom Sheet now supports individual column widths and row heights. On iPhone, select a cell and open **Cell size** to use the sliders. On a computer, you can also drag the right edge of a column heading or the bottom edge of a row number. Size settings are saved locally and included in JSON backups.
+
+
+## Version 13 layout cleanup
+
+- Salary-cycle summary is shown only on the Setup page.
+- Empty spreadsheet cells are vertically centered with their row numbers.
+- Touch devices hide row/column drag guides; use the Cell size panel instead.
