@@ -24,14 +24,14 @@
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest?v=14">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=14">
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=14">
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="manifest" href="manifest.webmanifest?v=19">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=19">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=19">
+  <link rel="stylesheet" href="styles.css?v=19">
 
-  <script src="cycle.js?v=14" defer></script>
-  <script src="db.js?v=14" defer></script>
-  <script src="app.js?v=14" defer></script>
+  <script src="cycle.js?v=19" defer></script>
+  <script src="db.js?v=19" defer></script>
+  <script src="app.js?v=19" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -249,6 +249,8 @@
             <button id="sheetAddRowButton" class="secondary-button compact-button" type="button">Add row</button>
             <button id="sheetAddColumnButton" class="secondary-button compact-button" type="button">Add column</button>
             <button id="sheetSizeButton" class="secondary-button compact-button" type="button" aria-expanded="false" aria-controls="sheetSizeControls">Cell size</button>
+            <button id="sheetCurrencyButton" class="secondary-button compact-button" type="button" aria-pressed="false">RM format</button>
+            <button id="sheetMergeButton" class="secondary-button compact-button" type="button" aria-pressed="false">Merge cells</button>
             <button id="sheetHeaderButton" class="secondary-button compact-button" type="button">Header row</button>
             <button id="sheetExportButton" class="secondary-button compact-button" type="button">Export CSV</button>
             <button id="sheetClearButton" class="danger-button compact-button" type="button">Clear</button>
@@ -287,13 +289,51 @@
             </div>
           </div>
 
+          <section class="sheet-value-link" aria-label="Link a dashboard value to the sheet">
+            <div class="sheet-value-link-heading">
+              <div>
+                <span>Dashboard link</span>
+                <strong>Display a live budget value in any cell</strong>
+              </div>
+              <span id="sheetLinkSummary" class="sheet-link-summary">No linked cells</span>
+            </div>
+
+            <div class="sheet-value-link-grid">
+              <label>
+                <span>Value</span>
+                <select id="sheetLinkMetric">
+                  <option value="income">Total income</option>
+                  <option value="expenses">Expenses</option>
+                  <option value="saved">Saved</option>
+                  <option value="available" selected>Available balance</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Cell</span>
+                <input id="sheetLinkCell" type="text" value="A10" maxlength="8" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="A10">
+              </label>
+            </div>
+
+            <div class="sheet-value-link-actions">
+              <button id="sheetLinkValueButton" class="primary-button compact-button" type="button">Link value</button>
+              <button id="sheetRefreshLinksButton" class="secondary-button compact-button" type="button">Refresh</button>
+              <button id="sheetUnlinkValueButton" class="secondary-button compact-button" type="button">Unlink cell</button>
+            </div>
+
+            <p class="form-help">The linked cell updates automatically when the selected budget month, salary, savings, or transactions change.</p>
+          </section>
+
           <div class="formula-bar" aria-label="Formula bar">
             <span id="activeCellLabel">A1</span>
             <input id="formulaInput" type="text" placeholder="Select a cell or type formula, e.g. =SUM(B2:B10)">
           </div>
 
           <p class="form-help sheet-help">
-            Formula examples: <strong>=SUM(B2:B10)</strong>, <strong>=AVG(C2:C8)</strong>, <strong>=A2+B2</strong>.
+            Formula examples: <strong>=SUM(B2:B10)</strong>, <strong>=AVG(C2:C8)</strong>, <strong>=A2+B2</strong>.<br>
+            Select a cell and tap <strong>RM format</strong> to display an entered number as <strong>RM 300.00</strong>. The stored number remains available for calculations.<br>
+            Dashboard formulas: <strong>=TOTALINCOME()</strong>, <strong>=EXPENSES()</strong>, <strong>=SAVED()</strong>, <strong>=AVAILABLE()</strong>.
+            To merge, select the first cell, tap <strong>Merge cells</strong>, then tap the opposite corner. Tap a merged cell and choose <strong>Unmerge</strong> to separate it.
             Use <strong>Cell size</strong> on iPhone, or drag the edge of a column or row heading on a computer.
           </p>
 

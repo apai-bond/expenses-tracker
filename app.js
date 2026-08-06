@@ -9,9 +9,11 @@ const state = {
   transactions: [],
   categories: [],
   customSheet: null,
+  latestSummary: null,
   activeSheetCell: "A1",
   sheetSaveTimer: null,
   sheetResize: null,
+  sheetMergeStart: null,
   python: null,
   pythonReady: false,
   toastTimer: null
@@ -115,6 +117,8 @@ function bindEvents() {
   document.getElementById("sheetAddRowButton").addEventListener("click", addCustomSheetRow);
   document.getElementById("sheetAddColumnButton").addEventListener("click", addCustomSheetColumn);
   document.getElementById("sheetSizeButton").addEventListener("click", toggleSheetSizeControls);
+  document.getElementById("sheetCurrencyButton").addEventListener("click", toggleSheetCurrencyFormat);
+  document.getElementById("sheetMergeButton").addEventListener("click", toggleSheetMergeAction);
   document.getElementById("sheetCloseSizeButton").addEventListener("click", () => setSheetSizeControlsOpen(false));
   document.getElementById("sheetColumnWidth").addEventListener("input", updateSelectedSheetColumnWidth);
   document.getElementById("sheetRowHeight").addEventListener("input", updateSelectedSheetRowHeight);
@@ -125,11 +129,17 @@ function bindEvents() {
   document.getElementById("sheetHeaderButton").addEventListener("click", toggleCustomSheetHeader);
   document.getElementById("sheetExportButton").addEventListener("click", exportCustomSheetCsv);
   document.getElementById("sheetClearButton").addEventListener("click", clearCustomSheetData);
+  document.getElementById("sheetLinkValueButton").addEventListener("click", linkDashboardValueToSheet);
+  document.getElementById("sheetRefreshLinksButton").addEventListener("click", refreshDashboardSheetLinks);
+  document.getElementById("sheetUnlinkValueButton").addEventListener("click", unlinkDashboardValueFromSheet);
+  document.getElementById("sheetLinkCell").addEventListener("input", normaliseSheetLinkCellInput);
   document.getElementById("formulaInput").addEventListener("input", updateActiveCellFromFormulaBar);
 
   const sheetTable = document.getElementById("customSheetTable");
   sheetTable.addEventListener("focusin", handleSheetCellFocus);
+  sheetTable.addEventListener("focusout", handleSheetCellBlur);
   sheetTable.addEventListener("input", handleSheetCellInput);
+  sheetTable.addEventListener("pointerdown", handleSheetMergePointerDown);
   sheetTable.addEventListener("pointerdown", handleSheetResizePointerDown);
 
   window.addEventListener("resize", debounce(() => {
@@ -213,7 +223,7 @@ async function loadPythonEngine() {
       indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.3/full/"
     });
 
-    const response = await fetch("calculations.py?v=14", { cache: "no-cache" });
+    const response = await fetch("calculations.py?v=19", { cache: "no-cache" });
     if (!response.ok) {
       throw new Error("Could not load calculations.py");
     }
@@ -252,6 +262,7 @@ async function refreshAll() {
   state.transactions = transactions;
   state.categories = categories;
   state.customSheet = normaliseCustomSheet(customSheet);
+  state.latestSummary = calculateSummaryFallback(state.monthRecord, state.transactions);
 
   renderCycleInformation();
   populateMonthSetup();
@@ -266,6 +277,11 @@ async function refreshAll() {
 function showView(viewName) {
   const validViews = ["home", "transactions", "add", "sheet", "settings"];
   const nextView = validViews.includes(viewName) ? viewName : "home";
+  if (nextView !== "sheet" && state.sheetMergeStart) {
+    state.sheetMergeStart = null;
+    updateSheetMergeButton();
+    updateSheetMergeSelectionVisual();
+  }
   state.currentView = nextView;
 
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
@@ -571,6 +587,7 @@ async function renderDashboard() {
   if (!state.monthRecord) return;
 
   const summary = await calculateSummary();
+  state.latestSummary = summary;
   document.getElementById("totalIncome").textContent = formatMoney(summary.totalIncome);
   document.getElementById("totalExpenses").textContent = formatMoney(summary.expenses);
   document.getElementById("totalSavings").textContent = formatMoney(summary.savings);
@@ -591,6 +608,7 @@ async function renderDashboard() {
   renderChartLegend(chartData, summary.expenses || 0);
   renderCategoryBars(summary.categoryTotals || [], summary.expenses || 0);
   renderRecentTransactions();
+  updateLinkedSheetDisplays();
 }
 
 async function calculateSummary() {
@@ -876,6 +894,126 @@ async function resetAllData() {
   showView("home");
 }
 
+function normaliseSheetMerge(source, rows, cols) {
+  if (!source || typeof source !== "object") return null;
+
+  let startRow = Number(source.startRow);
+  let startCol = Number(source.startCol);
+  let endRow = Number(source.endRow);
+  let endCol = Number(source.endCol);
+
+  if (![startRow, startCol, endRow, endCol].every(Number.isFinite)) {
+    const start = parseCellKey(source.start);
+    const end = parseCellKey(source.end);
+    if (!start || !end) return null;
+    startRow = start.row;
+    startCol = start.col;
+    endRow = end.row;
+    endCol = end.col;
+  }
+
+  const merge = {
+    startRow: Math.min(Math.max(Math.round(Math.min(startRow, endRow)), 1), rows),
+    startCol: Math.min(Math.max(Math.round(Math.min(startCol, endCol)), 1), cols),
+    endRow: Math.min(Math.max(Math.round(Math.max(startRow, endRow)), 1), rows),
+    endCol: Math.min(Math.max(Math.round(Math.max(startCol, endCol)), 1), cols)
+  };
+
+  if (merge.startRow === merge.endRow && merge.startCol === merge.endCol) return null;
+  return merge;
+}
+
+function sheetRangesOverlap(first, second) {
+  return !(
+    first.endRow < second.startRow ||
+    first.startRow > second.endRow ||
+    first.endCol < second.startCol ||
+    first.startCol > second.endCol
+  );
+}
+
+function normaliseSheetMerges(sourceMerges, rows, cols) {
+  const merges = [];
+  for (const source of Array.isArray(sourceMerges) ? sourceMerges : []) {
+    const merge = normaliseSheetMerge(source, rows, cols);
+    if (!merge || merges.some((existing) => sheetRangesOverlap(existing, merge))) continue;
+    merges.push(merge);
+  }
+  return merges;
+}
+
+function getSheetMergeAnchorKey(merge) {
+  return `${columnIndexToName(merge.startCol)}${merge.startRow}`;
+}
+
+function getSheetMergeRangeLabel(merge) {
+  const start = getSheetMergeAnchorKey(merge);
+  const end = `${columnIndexToName(merge.endCol)}${merge.endRow}`;
+  return `${start}:${end}`;
+}
+
+function isCellInsideSheetMerge(parsedCell, merge) {
+  return Boolean(parsedCell) &&
+    parsedCell.row >= merge.startRow && parsedCell.row <= merge.endRow &&
+    parsedCell.col >= merge.startCol && parsedCell.col <= merge.endCol;
+}
+
+function getSheetMergeForCell(cellKey) {
+  const parsed = parseCellKey(cellKey);
+  if (!parsed || !state.customSheet) return null;
+  return (state.customSheet.merges || []).find((merge) => isCellInsideSheetMerge(parsed, merge)) || null;
+}
+
+function getSheetMergedWidth(merge) {
+  let width = 0;
+  for (let col = merge.startCol; col <= merge.endCol; col += 1) {
+    width += getSheetColumnWidth(columnIndexToName(col));
+  }
+  return width;
+}
+
+function getSheetMergedHeight(merge) {
+  let height = 0;
+  for (let row = merge.startRow; row <= merge.endRow; row += 1) {
+    height += getSheetRowHeight(row);
+  }
+  return height;
+}
+
+function normaliseSheetLinks(links, rows, cols) {
+  const supportedMetrics = new Set(["income", "expenses", "saved", "available"]);
+  const uniqueCells = new Set();
+  const normalised = [];
+
+  for (const source of Array.isArray(links) ? links : []) {
+    const metric = String(source?.metric || "").toLowerCase();
+    const cell = String(source?.cell || "").toUpperCase();
+    const parsed = parseCellKey(cell);
+    if (!supportedMetrics.has(metric) || !parsed) continue;
+    if (parsed.row > rows || parsed.col > cols || uniqueCells.has(cell)) continue;
+    uniqueCells.add(cell);
+    normalised.push({ metric, cell });
+  }
+
+  return normalised;
+}
+
+function normaliseSheetFormats(sourceFormats, rows, cols) {
+  const formats = {};
+  if (!sourceFormats || typeof sourceFormats !== "object") return formats;
+
+  for (const [sourceCell, sourceFormat] of Object.entries(sourceFormats)) {
+    const cell = String(sourceCell || "").toUpperCase();
+    const parsed = parseCellKey(cell);
+    const format = String(sourceFormat || "").toLowerCase();
+    if (!parsed || parsed.row > rows || parsed.col > cols) continue;
+    if (format !== "currency" && format !== "number") continue;
+    formats[cell] = format;
+  }
+
+  return formats;
+}
+
 function normaliseCustomSheet(sheet) {
   const source = sheet || {};
   const rows = Math.min(Math.max(Number(source.rows || 20), 1), 120);
@@ -907,6 +1045,9 @@ function normaliseCustomSheet(sheet) {
     cells: source.cells && typeof source.cells === "object" ? { ...source.cells } : {},
     columnWidths,
     rowHeights,
+    formats: normaliseSheetFormats(source.formats, rows, cols),
+    merges: normaliseSheetMerges(source.merges, rows, cols),
+    links: normaliseSheetLinks(source.links, rows, cols),
     createdAt: source.createdAt || new Date().toISOString(),
     updatedAt: source.updatedAt || new Date().toISOString()
   };
@@ -923,8 +1064,12 @@ function renderCustomSheet() {
     state.activeSheetCell = "A1";
   }
 
+  const activeMerge = getSheetMergeForCell(state.activeSheetCell);
+  if (activeMerge) state.activeSheetCell = getSheetMergeAnchorKey(activeMerge);
+
   document.getElementById("customSheetTitle").textContent = sheet.name;
   document.getElementById("sheetHeaderButton").textContent = sheet.headerRow ? "Header on" : "Header off";
+  renderSheetLinkSummary();
 
   const table = document.getElementById("customSheetTable");
   const scrollContainer = table.closest(".sheet-scroll");
@@ -932,6 +1077,15 @@ function renderCustomSheet() {
   const previousScrollTop = scrollContainer?.scrollTop || 0;
   const columnHeaders = Array.from({ length: sheet.cols }, (_, index) => columnIndexToName(index + 1));
   const totalColumnWidth = columnHeaders.reduce((total, letter) => total + getSheetColumnWidth(letter), 42);
+  const mergeByCell = new Map();
+
+  for (const merge of sheet.merges) {
+    for (let row = merge.startRow; row <= merge.endRow; row += 1) {
+      for (let col = merge.startCol; col <= merge.endCol; col += 1) {
+        mergeByCell.set(`${columnIndexToName(col)}${row}`, merge);
+      }
+    }
+  }
 
   const headerHtml = `
     <thead>
@@ -952,16 +1106,38 @@ function renderCustomSheet() {
     const rowNumber = rowIndex + 1;
     const rowHeight = getSheetRowHeight(rowNumber);
     const isHeaderRow = sheet.headerRow && rowNumber === 1;
-    const cells = columnHeaders.map((letter) => {
+    const cells = columnHeaders.map((letter, columnIndex) => {
       const key = `${letter}${rowNumber}`;
-      const width = getSheetColumnWidth(letter);
-      const rawValue = getSheetRawValue(key);
-      const result = rawValue.trim().startsWith("=") ? formatSheetResult(evaluateSheetCell(key)) : "";
+      const merge = mergeByCell.get(key);
+      const anchorKey = merge ? getSheetMergeAnchorKey(merge) : key;
+      if (merge && anchorKey !== key) return "";
+
+      const link = getSheetLinkForCell(anchorKey);
+      const rawValue = link ? getSheetLinkFormula(link.metric) : getSheetStoredRawValue(anchorKey);
+      const isFormula = !link && rawValue.trim().startsWith("=");
+      const effectiveFormat = getEffectiveSheetCellFormat(anchorKey);
+      const displayValue = getSheetCellDisplayValue(anchorKey);
+      const width = merge ? getSheetMergedWidth(merge) : getSheetColumnWidth(letter);
+      const height = merge ? getSheetMergedHeight(merge) : rowHeight;
+      const colSpan = merge ? merge.endCol - merge.startCol + 1 : 1;
+      const rowSpan = merge ? merge.endRow - merge.startRow + 1 : 1;
+      const rangeLabel = merge ? getSheetMergeRangeLabel(merge) : key;
+      const classes = [
+        isHeaderRow ? "sheet-table-header-cell" : "",
+        merge ? "sheet-merged-cell" : "",
+        link ? "sheet-linked-cell" : "",
+        effectiveFormat === "currency" ? "sheet-currency-cell" : ""
+      ].filter(Boolean).join(" ");
+      const cellTitle = link
+        ? `${getSheetLinkLabel(link.metric)} linked to ${anchorKey}`
+        : merge ? `Merged ${rangeLabel}` : `Cell ${key}`;
+      const resultText = "";
+
       return `
-        <td class="${isHeaderRow ? "sheet-table-header-cell" : ""}" data-sheet-column="${letter}" data-sheet-row="${rowNumber}" style="width:${width}px;min-width:${width}px;max-width:${width}px;height:${rowHeight}px">
-          <div class="sheet-cell-wrap" style="height:${rowHeight}px;min-height:${rowHeight}px">
-            <input class="sheet-cell-input" data-cell="${key}" value="${escapeHtml(rawValue)}" placeholder="${isHeaderRow ? "Header" : ""}" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cell ${key}">
-            <small class="sheet-cell-result" data-result-cell="${key}">${result ? `= ${escapeHtml(result)}` : ""}</small>
+        <td class="${classes}" data-sheet-cell="${anchorKey}" data-sheet-column="${letter}" data-sheet-row="${rowNumber}" ${colSpan > 1 ? `colspan="${colSpan}"` : ""} ${rowSpan > 1 ? `rowspan="${rowSpan}"` : ""} style="width:${width}px;min-width:${width}px;max-width:${width}px;height:${height}px" title="${escapeHtml(cellTitle)}">
+          <div class="sheet-cell-wrap" style="height:${height}px;min-height:${height}px">
+            <input class="sheet-cell-input${link ? " linked-value" : ""}${effectiveFormat === "currency" ? " currency-value" : ""}" data-cell="${anchorKey}" value="${escapeHtml(displayValue)}" placeholder="${isHeaderRow ? "Header" : ""}" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" ${link ? "readonly" : ""} aria-label="${escapeHtml(cellTitle)}">
+            <small class="sheet-cell-result" data-result-cell="${anchorKey}">${escapeHtml(resultText)}</small>
           </div>
         </td>`;
     }).join("");
@@ -979,6 +1155,7 @@ function renderCustomSheet() {
   table.innerHTML = `${headerHtml}<tbody>${bodyHtml}</tbody>`;
   setActiveSheetCell(state.activeSheetCell || "A1", false);
   updateSheetSizeControls();
+  updateSheetMergeSelectionVisual();
 
   if (scrollContainer) {
     scrollContainer.scrollLeft = previousScrollLeft;
@@ -990,6 +1167,17 @@ function handleSheetCellFocus(event) {
   const input = event.target.closest?.(".sheet-cell-input");
   if (!input) return;
   setActiveSheetCell(input.dataset.cell, true);
+
+  const link = getSheetLinkForCell(input.dataset.cell);
+  if (!link) {
+    input.value = getSheetStoredRawValue(input.dataset.cell);
+  }
+}
+
+function handleSheetCellBlur(event) {
+  const input = event.target.closest?.(".sheet-cell-input");
+  if (!input) return;
+  input.value = getSheetCellDisplayValue(input.dataset.cell);
 }
 
 function handleSheetCellInput(event) {
@@ -1006,37 +1194,275 @@ function handleSheetCellInput(event) {
 
 function setActiveSheetCell(cellKey, syncFormula) {
   if (!cellKey) return;
-  state.activeSheetCell = cellKey;
-  document.getElementById("activeCellLabel").textContent = cellKey;
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : cellKey;
+  state.activeSheetCell = resolvedCell;
+  document.getElementById("activeCellLabel").textContent = merge ? getSheetMergeRangeLabel(merge) : resolvedCell;
   document.querySelectorAll(".sheet-cell-input.active").forEach((input) => input.classList.remove("active"));
-  const activeInput = document.querySelector(`.sheet-cell-input[data-cell="${cellKey}"]`);
+  const activeInput = document.querySelector(`.sheet-cell-input[data-cell="${resolvedCell}"]`);
   if (activeInput) activeInput.classList.add("active");
-  if (syncFormula) document.getElementById("formulaInput").value = getSheetRawValue(cellKey);
+  if (syncFormula) document.getElementById("formulaInput").value = getSheetRawValue(resolvedCell);
+  const linkCellInput = document.getElementById("sheetLinkCell");
+  if (linkCellInput && document.activeElement !== linkCellInput) linkCellInput.value = resolvedCell;
   updateSheetSizeControls();
+  updateSheetCurrencyButton();
+  updateSheetMergeButton();
+  updateSheetMergeSelectionVisual();
 }
 
 function updateActiveCellFromFormulaBar(event) {
   if (!state.activeSheetCell) return;
   const value = event.target.value;
+  const removedLink = removeSheetLinkForCell(state.activeSheetCell);
   setSheetRawValue(state.activeSheetCell, value);
-  const activeInput = document.querySelector(`.sheet-cell-input[data-cell="${state.activeSheetCell}"]`);
-  if (activeInput) activeInput.value = value;
-  updateSheetFormulaResults();
+  if (removedLink) {
+    renderCustomSheet();
+    document.getElementById("formulaInput").value = value;
+  } else {
+    updateSheetFormulaResults();
+  }
   scheduleCustomSheetSave();
 }
 
-function getSheetRawValue(cellKey) {
+function getSheetStoredRawValue(cellKey) {
   return String(state.customSheet?.cells?.[cellKey] ?? "");
+}
+
+function getSheetRawValue(cellKey) {
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : cellKey;
+  const link = getSheetLinkForCell(resolvedCell);
+  return link ? getSheetLinkFormula(link.metric) : getSheetStoredRawValue(resolvedCell);
+}
+
+function getSheetCellDisplayValue(cellKey) {
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : String(cellKey || "").toUpperCase();
+  const link = getSheetLinkForCell(resolvedCell);
+  if (link) return formatMoney(getSheetLinkedMetricValue(link.metric));
+
+  const rawValue = getSheetStoredRawValue(resolvedCell);
+  const format = getEffectiveSheetCellFormat(resolvedCell);
+  if (rawValue.trim().startsWith("=")) {
+    const result = evaluateSheetCell(resolvedCell);
+    return format === "currency" ? formatSheetMoneyResult(result) : formatSheetResult(result);
+  }
+
+  if (format === "currency" || format === "number") {
+    const numericValue = tryParseSheetNumber(rawValue);
+    if (numericValue !== null) {
+      return format === "currency" ? formatMoney(numericValue) : formatSheetResult(numericValue);
+    }
+  }
+
+  return rawValue;
+}
+
+function getSheetCellFormatSetting(cellKey) {
+  if (!state.customSheet) return "";
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : String(cellKey || "").toUpperCase();
+  const setting = String(state.customSheet.formats?.[resolvedCell] || "").toLowerCase();
+  return setting === "currency" || setting === "number" ? setting : "";
+}
+
+function getEffectiveSheetCellFormat(cellKey) {
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : String(cellKey || "").toUpperCase();
+  if (getSheetLinkForCell(resolvedCell)) return "currency";
+
+  const explicitFormat = getSheetCellFormatSetting(resolvedCell);
+  if (explicitFormat) return explicitFormat;
+
+  return getSheetStoredRawValue(resolvedCell).trim().startsWith("=") ? "currency" : "general";
+}
+
+function setSheetCellFormat(cellKey, format) {
+  if (!state.customSheet) return;
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : String(cellKey || "").toUpperCase();
+  if (!state.customSheet.formats) state.customSheet.formats = {};
+
+  if (format === "currency" || format === "number") {
+    state.customSheet.formats[resolvedCell] = format;
+  } else {
+    delete state.customSheet.formats[resolvedCell];
+  }
+}
+
+function updateSheetCurrencyButton() {
+  const button = document.getElementById("sheetCurrencyButton");
+  if (!button || !state.activeSheetCell) return;
+
+  const isLinked = Boolean(getSheetLinkForCell(state.activeSheetCell));
+  const isCurrency = getEffectiveSheetCellFormat(state.activeSheetCell) === "currency";
+  button.disabled = isLinked;
+  button.textContent = isLinked ? "RM linked" : isCurrency ? "Remove RM" : "RM format";
+  button.classList.toggle("active-tool", isCurrency);
+  button.setAttribute("aria-pressed", String(isCurrency));
+  button.title = isLinked
+    ? "Dashboard-linked values always use RM formatting"
+    : isCurrency ? "Show this cell as a plain number" : "Show this cell as Malaysian Ringgit";
+}
+
+async function toggleSheetCurrencyFormat() {
+  if (!state.customSheet || !state.activeSheetCell) return;
+  if (getSheetLinkForCell(state.activeSheetCell)) {
+    showToast("Dashboard-linked cells already use RM formatting.");
+    return;
+  }
+
+  const currentFormat = getEffectiveSheetCellFormat(state.activeSheetCell);
+  const nextFormat = currentFormat === "currency" ? "number" : "currency";
+  setSheetCellFormat(state.activeSheetCell, nextFormat);
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(nextFormat === "currency"
+    ? `${state.activeSheetCell} now displays RM currency.`
+    : `${state.activeSheetCell} now displays a plain number.`);
 }
 
 function setSheetRawValue(cellKey, value) {
   if (!state.customSheet) return;
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : cellKey;
   if (!state.customSheet.cells) state.customSheet.cells = {};
   const text = String(value ?? "");
   if (text.trim() === "") {
-    delete state.customSheet.cells[cellKey];
+    delete state.customSheet.cells[resolvedCell];
   } else {
-    state.customSheet.cells[cellKey] = text;
+    state.customSheet.cells[resolvedCell] = text;
+  }
+}
+
+function getSheetLinkForCell(cellKey) {
+  if (!state.customSheet) return null;
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : String(cellKey || "").toUpperCase();
+  return (state.customSheet.links || []).find((link) => link.cell === resolvedCell) || null;
+}
+
+function removeSheetLinkForCell(cellKey) {
+  if (!state.customSheet) return null;
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : String(cellKey || "").toUpperCase();
+  const existing = (state.customSheet.links || []).find((link) => link.cell === resolvedCell) || null;
+  if (!existing) return null;
+  state.customSheet.links = (state.customSheet.links || []).filter((link) => link.cell !== resolvedCell);
+  return existing;
+}
+
+function getSheetLinkFormula(metric) {
+  if (metric === "income") return "=TOTALINCOME()";
+  if (metric === "expenses") return "=EXPENSES()";
+  if (metric === "saved") return "=SAVED()";
+  if (metric === "available") return "=AVAILABLE()";
+  return "";
+}
+
+function getSheetLinkLabel(metric) {
+  if (metric === "income") return "Total income";
+  if (metric === "expenses") return "Expenses";
+  if (metric === "saved") return "Saved";
+  if (metric === "available") return "Available balance";
+  return "Dashboard value";
+}
+
+function getSheetLinkedMetricValue(metric) {
+  const summary = state.latestSummary || calculateSummaryFallback(state.monthRecord || {}, state.transactions || []);
+  if (metric === "income") return numberValue(summary.totalIncome);
+  if (metric === "expenses") return numberValue(summary.expenses);
+  if (metric === "saved") return numberValue(summary.savings);
+  if (metric === "available") return numberValue(summary.available);
+  return 0;
+}
+
+function normaliseSheetLinkCellInput(event) {
+  const input = event.target;
+  input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function resolveSheetLinkTarget(value) {
+  if (!state.customSheet) return null;
+  const requested = String(value || "").trim().toUpperCase();
+  const parsed = parseCellKey(requested);
+  if (!parsed || parsed.row > state.customSheet.rows || parsed.col > state.customSheet.cols) return null;
+  const merge = getSheetMergeForCell(requested);
+  return merge ? getSheetMergeAnchorKey(merge) : requested;
+}
+
+async function linkDashboardValueToSheet() {
+  if (!state.customSheet) return;
+  const metric = document.getElementById("sheetLinkMetric").value || "available";
+  const input = document.getElementById("sheetLinkCell");
+  const target = resolveSheetLinkTarget(input.value);
+
+  if (!target) {
+    showToast(`Enter a valid cell between A1 and ${columnIndexToName(state.customSheet.cols)}${state.customSheet.rows}.`);
+    input.focus();
+    return;
+  }
+
+  const existingText = getSheetStoredRawValue(target).trim();
+  const existingLink = getSheetLinkForCell(target);
+  if ((existingText || existingLink) && !(existingLink?.metric === metric)) {
+    const confirmed = window.confirm(`Replace the current content in ${target} with ${getSheetLinkLabel(metric)}?`);
+    if (!confirmed) return;
+  }
+
+  if (!Array.isArray(state.customSheet.links)) state.customSheet.links = [];
+  state.customSheet.links = state.customSheet.links.filter((link) => link.cell !== target);
+  state.customSheet.links.push({ metric, cell: target });
+  delete state.customSheet.cells?.[target];
+  delete state.customSheet.formats?.[target];
+  state.activeSheetCell = target;
+  input.value = target;
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`${getSheetLinkLabel(metric)} linked to ${target}.`);
+}
+
+async function unlinkDashboardValueFromSheet() {
+  if (!state.customSheet) return;
+  const input = document.getElementById("sheetLinkCell");
+  const target = resolveSheetLinkTarget(input.value) || state.activeSheetCell;
+  const removed = removeSheetLinkForCell(target);
+  if (!removed) {
+    showToast(`${target || "That cell"} is not linked.`);
+    return;
+  }
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`${target} unlinked.`);
+}
+
+async function refreshDashboardSheetLinks() {
+  state.latestSummary = await calculateSummary();
+  updateLinkedSheetDisplays();
+  renderSheetLinkSummary();
+  showToast("Linked dashboard values refreshed.");
+}
+
+function renderSheetLinkSummary() {
+  const summary = document.getElementById("sheetLinkSummary");
+  if (!summary || !state.customSheet) return;
+  const links = state.customSheet.links || [];
+  if (!links.length) {
+    summary.textContent = "No linked cells";
+    return;
+  }
+  summary.textContent = links
+    .map((link) => `${getSheetLinkLabel(link.metric)} → ${link.cell}`)
+    .join(" · ");
+}
+
+function updateLinkedSheetDisplays() {
+  if (!state.customSheet) return;
+  for (const link of state.customSheet.links || []) {
+    const input = document.querySelector(`.sheet-cell-input[data-cell="${link.cell}"]`);
+    if (input) input.value = formatMoney(getSheetLinkedMetricValue(link.metric));
+    const result = document.querySelector(`.sheet-cell-result[data-result-cell="${link.cell}"]`);
+    if (result) result.textContent = "";
   }
 }
 
@@ -1120,8 +1546,12 @@ function setSheetColumnWidth(letter, value, shouldSave) {
   const width = clampNumber(value, SHEET_SIZE_LIMITS.minColumn, SHEET_SIZE_LIMITS.maxColumn);
   if (!state.customSheet.columnWidths) state.customSheet.columnWidths = {};
   state.customSheet.columnWidths[letter] = width;
-  applyRenderedSheetColumnWidth(letter, width);
-  updateRenderedSheetTableWidth();
+  if ((state.customSheet.merges || []).length) {
+    renderCustomSheet();
+  } else {
+    applyRenderedSheetColumnWidth(letter, width);
+    updateRenderedSheetTableWidth();
+  }
   updateSheetSizeControls();
   if (shouldSave) scheduleCustomSheetSave();
 }
@@ -1132,7 +1562,11 @@ function setSheetRowHeight(rowNumber, value, shouldSave) {
   const height = clampNumber(value, SHEET_SIZE_LIMITS.minRow, SHEET_SIZE_LIMITS.maxRow);
   if (!state.customSheet.rowHeights) state.customSheet.rowHeights = {};
   state.customSheet.rowHeights[row] = height;
-  applyRenderedSheetRowHeight(row, height);
+  if ((state.customSheet.merges || []).length) {
+    renderCustomSheet();
+  } else {
+    applyRenderedSheetRowHeight(row, height);
+  }
   updateSheetSizeControls();
   if (shouldSave) scheduleCustomSheetSave();
 }
@@ -1219,6 +1653,151 @@ async function resetAllSheetSizes() {
   showToast("All row and column sizes reset.");
 }
 
+
+function updateSheetMergeButton() {
+  const button = document.getElementById("sheetMergeButton");
+  if (!button) return;
+
+  if (state.sheetMergeStart) {
+    button.textContent = "Cancel merge";
+    button.classList.add("active-tool");
+    button.setAttribute("aria-pressed", "true");
+    return;
+  }
+
+  const merge = getSheetMergeForCell(state.activeSheetCell);
+  button.textContent = merge ? "Unmerge" : "Merge cells";
+  button.classList.remove("active-tool");
+  button.setAttribute("aria-pressed", "false");
+}
+
+function updateSheetMergeSelectionVisual() {
+  document.querySelectorAll(".sheet-merge-start-cell").forEach((element) => {
+    element.classList.remove("sheet-merge-start-cell");
+  });
+
+  if (!state.sheetMergeStart) return;
+  const cell = document.querySelector(`#customSheetTable td[data-sheet-cell="${state.sheetMergeStart}"]`);
+  cell?.classList.add("sheet-merge-start-cell");
+}
+
+async function toggleSheetMergeAction() {
+  if (!state.customSheet) return;
+
+  if (state.sheetMergeStart) {
+    state.sheetMergeStart = null;
+    updateSheetMergeButton();
+    updateSheetMergeSelectionVisual();
+    showToast("Merge selection cancelled.");
+    return;
+  }
+
+  const existingMerge = getSheetMergeForCell(state.activeSheetCell);
+  if (existingMerge) {
+    await unmergeSheetRange(existingMerge);
+    return;
+  }
+
+  state.sheetMergeStart = state.activeSheetCell || "A1";
+  document.activeElement?.blur?.();
+  updateSheetMergeButton();
+  updateSheetMergeSelectionVisual();
+  showToast(`Start ${state.sheetMergeStart} selected. Tap the opposite corner cell.`);
+}
+
+function handleSheetMergePointerDown(event) {
+  if (!state.sheetMergeStart) return;
+  const cell = event.target.closest?.("td[data-sheet-cell]");
+  if (!cell) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  completeSheetMerge(state.sheetMergeStart, cell.dataset.sheetCell)
+    .catch((error) => {
+      console.error("Unable to merge cells:", error);
+      showToast("Unable to merge those cells.");
+    });
+}
+
+async function completeSheetMerge(startKey, endKey) {
+  if (!state.customSheet) return;
+  const start = parseCellKey(startKey);
+  const end = parseCellKey(endKey);
+  if (!start || !end) return;
+
+  const merge = {
+    startRow: Math.min(start.row, end.row),
+    startCol: Math.min(start.col, end.col),
+    endRow: Math.max(start.row, end.row),
+    endCol: Math.max(start.col, end.col)
+  };
+
+  if (merge.startRow === merge.endRow && merge.startCol === merge.endCol) {
+    showToast("Choose an opposite corner to merge at least two cells.");
+    return;
+  }
+
+  if ((state.customSheet.merges || []).some((existing) => sheetRangesOverlap(existing, merge))) {
+    state.sheetMergeStart = null;
+    updateSheetMergeButton();
+    updateSheetMergeSelectionVisual();
+    showToast("Unmerge the existing merged cells in this range first.");
+    return;
+  }
+
+  const anchorKey = getSheetMergeAnchorKey(merge);
+  const rangeCells = expandSheetRange(anchorKey, `${columnIndexToName(merge.endCol)}${merge.endRow}`);
+  const cellsWithData = rangeCells.filter((key) => key !== anchorKey && (
+    getSheetStoredRawValue(key).trim() !== "" || Boolean(getSheetLinkForCell(key))
+  ));
+
+  if (cellsWithData.length) {
+    const confirmed = window.confirm(
+      `Merge ${getSheetMergeRangeLabel(merge)}? Only the value in ${anchorKey} will be kept; ${cellsWithData.length} other populated cell${cellsWithData.length === 1 ? "" : "s"} will be cleared.`
+    );
+    if (!confirmed) {
+      state.sheetMergeStart = null;
+      updateSheetMergeButton();
+      updateSheetMergeSelectionVisual();
+      return;
+    }
+  }
+
+  for (const key of rangeCells) {
+    if (key !== anchorKey) {
+      delete state.customSheet.cells?.[key];
+      delete state.customSheet.formats?.[key];
+    }
+  }
+  state.customSheet.links = (state.customSheet.links || []).filter((link) => (
+    link.cell === anchorKey || !rangeCells.includes(link.cell)
+  ));
+
+  if (!Array.isArray(state.customSheet.merges)) state.customSheet.merges = [];
+  state.customSheet.merges.push(merge);
+  state.sheetMergeStart = null;
+  state.activeSheetCell = anchorKey;
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`${getSheetMergeRangeLabel(merge)} merged.`);
+}
+
+async function unmergeSheetRange(merge) {
+  if (!state.customSheet || !merge) return;
+  const label = getSheetMergeRangeLabel(merge);
+  state.customSheet.merges = (state.customSheet.merges || []).filter((existing) => !(
+    existing.startRow === merge.startRow &&
+    existing.startCol === merge.startCol &&
+    existing.endRow === merge.endRow &&
+    existing.endCol === merge.endCol
+  ));
+  state.sheetMergeStart = null;
+  state.activeSheetCell = getSheetMergeAnchorKey(merge);
+  await saveCustomSheetNow();
+  renderCustomSheet();
+  showToast(`${label} unmerged.`);
+}
+
 function handleSheetResizePointerDown(event) {
   if (!state.customSheet || event.button > 0) return;
   const columnHandle = event.target.closest?.("[data-resize-column]");
@@ -1294,14 +1873,13 @@ function finishSheetResize(event) {
 }
 
 function updateSheetFormulaResults() {
-  document.querySelectorAll(".sheet-cell-result[data-result-cell]").forEach((element) => {
-    const cellKey = element.dataset.resultCell;
-    const rawValue = getSheetRawValue(cellKey);
-    if (!rawValue.trim().startsWith("=")) {
-      element.textContent = "";
-      return;
-    }
-    element.textContent = `= ${formatSheetResult(evaluateSheetCell(cellKey))}`;
+  document.querySelectorAll(".sheet-cell-input[data-cell]").forEach((input) => {
+    const cellKey = input.dataset.cell;
+    const result = document.querySelector(`.sheet-cell-result[data-result-cell="${cellKey}"]`);
+    if (result) result.textContent = "";
+
+    if (document.activeElement === input) return;
+    input.value = getSheetCellDisplayValue(cellKey);
   });
 }
 
@@ -1357,8 +1935,9 @@ function exportCustomSheetCsv() {
     const values = [];
     for (let col = 1; col <= state.customSheet.cols; col += 1) {
       const key = `${columnIndexToName(col)}${row}`;
-      const rawValue = getSheetRawValue(key);
-      const output = rawValue.trim().startsWith("=") ? formatSheetResult(evaluateSheetCell(key)) : rawValue;
+      const merge = getSheetMergeForCell(key);
+      const isCoveredCell = merge && getSheetMergeAnchorKey(merge) !== key;
+      const output = isCoveredCell ? "" : getSheetCellDisplayValue(key);
       values.push(csvEscape(output));
     }
     rows.push(values.join(","));
@@ -1382,12 +1961,16 @@ function csvEscape(value) {
 }
 
 function evaluateSheetCell(cellKey, visited = new Set()) {
-  const rawValue = getSheetRawValue(cellKey).trim();
+  const merge = getSheetMergeForCell(cellKey);
+  const resolvedCell = merge ? getSheetMergeAnchorKey(merge) : cellKey;
+  const link = getSheetLinkForCell(resolvedCell);
+  if (link) return getSheetLinkedMetricValue(link.metric);
+  const rawValue = getSheetStoredRawValue(resolvedCell).trim();
   if (!rawValue.startsWith("=")) return parseSheetNumber(rawValue);
-  if (visited.has(cellKey)) return "#CYCLE";
-  visited.add(cellKey);
+  if (visited.has(resolvedCell)) return "#CYCLE";
+  visited.add(resolvedCell);
   const result = evaluateSheetFormula(rawValue, visited);
-  visited.delete(cellKey);
+  visited.delete(resolvedCell);
   return result;
 }
 
@@ -1396,6 +1979,10 @@ function evaluateSheetFormula(rawFormula, visited) {
   if (!expression) return "";
 
   try {
+    expression = expression.replace(/\bTOTALINCOME\(\)/g, String(getSheetLinkedMetricValue("income")));
+    expression = expression.replace(/\bEXPENSES\(\)/g, String(getSheetLinkedMetricValue("expenses")));
+    expression = expression.replace(/\b(?:SAVED|SAVINGS)\(\)/g, String(getSheetLinkedMetricValue("saved")));
+    expression = expression.replace(/\bAVAILABLE\(\)/g, String(getSheetLinkedMetricValue("available")));
     expression = expression.replace(/\b(SUM|AVG|MIN|MAX|COUNT)\(([^()]+)\)/g, (_match, functionName, argumentText) => {
       const values = collectSheetFormulaValues(argumentText, visited);
       if (functionName === "COUNT") return String(values.filter((item) => Number.isFinite(item)).length);
@@ -1480,11 +2067,20 @@ function columnNameToIndex(name) {
   }, 0);
 }
 
-function parseSheetNumber(value) {
-  const cleaned = String(value ?? "").replace(/,/g, "").trim();
-  if (!cleaned) return 0;
+function tryParseSheetNumber(value) {
+  let cleaned = String(value ?? "").trim();
+  if (!cleaned) return null;
+  cleaned = cleaned
+    .replace(/^\s*(?:RM|MYR)\s*/i, "")
+    .replace(/,/g, "")
+    .replace(/\s+/g, "");
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(cleaned)) return null;
   const number = Number(cleaned);
-  return Number.isFinite(number) ? number : 0;
+  return Number.isFinite(number) ? number : null;
+}
+
+function parseSheetNumber(value) {
+  return tryParseSheetNumber(value) ?? 0;
 }
 
 function formatSheetResult(value) {
@@ -1493,6 +2089,12 @@ function formatSheetResult(value) {
   return new Intl.NumberFormat("en-MY", {
     maximumFractionDigits: 4
   }).format(value);
+}
+
+function formatSheetMoneyResult(value) {
+  if (typeof value === "string") return value;
+  if (!Number.isFinite(value)) return "#ERR";
+  return formatMoney(value);
 }
 
 function loadExternalScript(url) {

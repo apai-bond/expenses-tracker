@@ -232,6 +232,9 @@ const BudgetDB = (() => {
       cells: {},
       columnWidths: {},
       rowHeights: {},
+      formats: {},
+      merges: [],
+      links: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -258,6 +261,9 @@ const BudgetDB = (() => {
       cells: sheet.cells || {},
       columnWidths: sheet.columnWidths && typeof sheet.columnWidths === "object" ? sheet.columnWidths : {},
       rowHeights: sheet.rowHeights && typeof sheet.rowHeights === "object" ? sheet.rowHeights : {},
+      formats: sheet.formats && typeof sheet.formats === "object" ? sheet.formats : {},
+      merges: Array.isArray(sheet.merges) ? sheet.merges : [],
+      links: Array.isArray(sheet.links) ? sheet.links : [],
       updatedAt: new Date().toISOString()
     });
     await done;
@@ -289,7 +295,7 @@ const BudgetDB = (() => {
 
     return {
       app: "Pocket Budget",
-      version: 4,
+      version: 6,
       exportedAt: new Date().toISOString(),
       months,
       transactions,

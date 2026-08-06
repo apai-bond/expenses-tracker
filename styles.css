@@ -1761,3 +1761,171 @@ body.sheet-resizing-row * {
   text-transform: none;
   letter-spacing: 0;
 }
+
+
+/* V15: merged cells in the custom sheet */
+.custom-sheet-table td.sheet-merged-cell {
+  position: relative;
+  background: var(--surface-soft);
+}
+
+.sheet-merged-cell .sheet-cell-wrap {
+  padding: 8px;
+}
+
+.sheet-merged-cell .sheet-cell-input {
+  min-height: 36px;
+  font-weight: 750;
+}
+
+.custom-sheet-table td.sheet-merge-start-cell {
+  box-shadow: inset 0 0 0 3px var(--primary);
+}
+
+.custom-sheet-table td.sheet-merge-start-cell .sheet-cell-input {
+  background: var(--surface-soft);
+}
+
+
+/* V16: link dashboard values to spreadsheet cells */
+.sheet-value-link {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.sheet-value-link-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sheet-value-link-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.sheet-value-link-heading span,
+.sheet-value-link-grid label > span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.sheet-value-link-heading strong {
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.sheet-link-summary {
+  max-width: 48%;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-dark) !important;
+  font-size: 0.68rem !important;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.sheet-value-link-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(96px, 0.7fr);
+  gap: 10px;
+}
+
+.sheet-value-link-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sheet-value-link-grid input,
+.sheet-value-link-grid select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+
+.sheet-value-link-grid input {
+  text-transform: uppercase;
+  font-weight: 850;
+  text-align: center;
+}
+
+.sheet-value-link-actions {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 8px;
+}
+
+.sheet-value-link-actions .compact-button {
+  min-height: 42px;
+  padding-inline: 9px;
+}
+
+.sheet-value-link .form-help {
+  margin: 0;
+}
+
+.custom-sheet-table td.sheet-linked-cell {
+  background: color-mix(in srgb, var(--primary-soft) 72%, var(--surface));
+}
+
+.sheet-cell-input.linked-value {
+  color: var(--primary-dark);
+  font-weight: 900;
+  cursor: default;
+}
+
+.sheet-linked-cell .sheet-cell-result {
+  color: var(--primary-dark);
+  font-weight: 750;
+}
+
+@media (max-width: 520px) {
+  .sheet-value-link-heading {
+    display: grid;
+  }
+
+  .sheet-link-summary {
+    max-width: 100%;
+    width: fit-content;
+    text-align: left;
+  }
+
+  .sheet-value-link-grid {
+    grid-template-columns: minmax(0, 1fr) 92px;
+  }
+
+  .sheet-value-link-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .sheet-value-link-actions #sheetLinkValueButton {
+    grid-column: 1 / -1;
+  }
+}
+
+
+/* V19: optional RM formatting for custom-sheet cells */
+.sheet-toolbar .compact-button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.sheet-cell-input.currency-value {
+  font-variant-numeric: tabular-nums;
+}

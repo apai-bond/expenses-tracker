@@ -1,8 +1,8 @@
-# Pocket Budget - Salary Cycle Test Version
+# Pocket Budget - Dashboard Link Test Version
 
 Pocket Budget is a mobile-first personal expense tracker that can run in Safari on an iPhone. Records are stored locally in IndexedDB on the device.
 
-## Version 8 features
+## Main features
 
 - Budget month based on the salary cycle rather than the 1st to the last day of the month
 - Standard salary day set to the 27th of the previous month
@@ -64,7 +64,7 @@ python start_server.py
 4. Open:
 
 ```text
-http://localhost:8000/?v=8
+http://localhost:8000/?v=16
 ```
 
 Do not double-click `index.html`. The app loads its files through the local web server.
@@ -77,7 +77,7 @@ Do not double-click `index.html`. The app loads its files through the local web 
 4. Open Safari on the iPhone and enter:
 
 ```text
-http://192.168.1.50:8000/?v=8
+http://192.168.1.50:8000/?v=16
 ```
 
 The computer and iPhone must be connected to the same local network. Allow Python through Windows Firewall on private networks when prompted.
@@ -86,10 +86,10 @@ The computer and iPhone must be connected to the same local network. Allow Pytho
 
 Upload all project files to the repository root, including the new `cycle.js` file. GitHub Pages should deploy from the `main` branch and `/ (root)` folder.
 
-After deployment, close and reopen the Home Screen app. The Version 8 service worker uses this cache name:
+After deployment, close and reopen the Home Screen app. Version 16 uses this cache name:
 
 ```text
-pocket-budget-v8-salary-cycle
+pocket-budget-v16-dashboard-links
 ```
 
 ## Data backup
@@ -125,3 +125,39 @@ The Custom Sheet now supports individual column widths and row heights. On iPhon
 - Salary-cycle summary is shown only on the Setup page.
 - Empty spreadsheet cells are vertically centered with their row numbers.
 - Touch devices hide row/column drag guides; use the Cell size panel instead.
+
+## Merged cells (Version 15)
+
+The Custom Sheet supports rectangular merged ranges. Select the first cell, tap **Merge cells**, then tap the opposite corner. Only the top-left value is retained. Tap a merged cell and choose **Unmerge** to restore the individual empty cells. Merged ranges are stored in IndexedDB and included in JSON backups.
+
+
+## Dashboard links (Version 16)
+
+The Custom Sheet can display live values from the current Home dashboard in any chosen cell. Available values are **Total income**, **Expenses**, **Saved**, and **Available balance**. Open **Sheet**, choose a value, enter a target such as `A10`, and tap **Link value**. The linked cell updates when the selected budget month, salary, saving entries, or transactions change.
+
+Use **Refresh** for a manual update or **Unlink cell** to restore a normal editable cell. Dashboard formulas can also be entered directly: `=TOTALINCOME()`, `=EXPENSES()`, `=SAVED()`, and `=AVAILABLE()`. Linked cells can be used in other calculations, such as `=A10+500`. Links are saved in IndexedDB and included in JSON backups.
+
+## Version 17: cleaner spreadsheet values
+
+- Dashboard-linked cells show only the amount, without the small metric label.
+- Formula cells show the calculated value after editing instead of displaying the formula in the cell.
+- Numeric formula results use Malaysian currency formatting such as `RM 700.00`.
+- Select a formula cell to edit its original formula in the formula bar.
+
+
+
+## Version 18: Home dashboard values in the Sheet
+
+The **Dashboard link** dropdown now includes:
+
+- Total income
+- Expenses
+- Saved
+- Available balance
+
+Each linked cell displays the selected value as `RM 0.00` and updates automatically. Direct formulas are also supported: `=TOTALINCOME()`, `=EXPENSES()`, `=SAVED()`, and `=AVAILABLE()`.
+
+
+## Version 19: RM formatting in the Custom Sheet
+
+Select a spreadsheet cell and use **RM format** to display a number as Malaysian Ringgit without converting it into text. The underlying numeric value remains usable in formulas. Tap **Remove RM** for plain-number display. Cell formats are stored locally and included in backups.
