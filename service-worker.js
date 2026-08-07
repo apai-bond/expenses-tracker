@@ -1,21 +1,21 @@
 "use strict";
 
-const CACHE_NAME = "pocket-budget-v19-rm-format";
+const CACHE_NAME = "pocket-budget-v20-toolbar-position";
 const LOCAL_ASSETS = [
   "./",
   "index.html",
-  "styles.css?v=19",
-  "cycle.js?v=19",
-  "db.js?v=19",
-  "app.js?v=19",
-  "calculations.py?v=19",
-  "manifest.webmanifest?v=19",
-  "icons/icon-192.png?v=19",
-  "icons/icon-512.png?v=19",
-  "icons/icon-1024.png?v=19",
-  "icons/apple-touch-icon.png?v=19",
-  "icons/favicon.svg?v=19",
-  "icons/app-icon.svg?v=19"
+  "styles.css?v=20",
+  "cycle.js?v=20",
+  "db.js?v=20",
+  "app.js?v=20",
+  "calculations.py?v=20",
+  "manifest.webmanifest?v=20",
+  "icons/icon-192.png?v=20",
+  "icons/icon-512.png?v=20",
+  "icons/icon-1024.png?v=20",
+  "icons/apple-touch-icon.png?v=20",
+  "icons/favicon.svg?v=20",
+  "icons/app-icon.svg?v=20"
 ];
 
 self.addEventListener("install", (event) => {

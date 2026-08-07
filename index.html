@@ -24,14 +24,14 @@
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest?v=19">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=19">
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=19">
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="manifest" href="manifest.webmanifest?v=20">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=20">
+  <link rel="stylesheet" href="styles.css?v=20">
 
-  <script src="cycle.js?v=19" defer></script>
-  <script src="db.js?v=19" defer></script>
-  <script src="app.js?v=19" defer></script>
+  <script src="cycle.js?v=20" defer></script>
+  <script src="db.js?v=20" defer></script>
+  <script src="app.js?v=20" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -238,57 +238,6 @@
         </div>
 
         <section class="panel sheet-panel">
-          <div class="panel-heading sheet-title-row">
-            <div>
-              <p class="section-kicker">TABLE</p>
-              <h2 id="customSheetTitle">Quick table</h2>
-            </div>
-          </div>
-
-          <div class="sheet-toolbar" aria-label="Spreadsheet tools">
-            <button id="sheetAddRowButton" class="secondary-button compact-button" type="button">Add row</button>
-            <button id="sheetAddColumnButton" class="secondary-button compact-button" type="button">Add column</button>
-            <button id="sheetSizeButton" class="secondary-button compact-button" type="button" aria-expanded="false" aria-controls="sheetSizeControls">Cell size</button>
-            <button id="sheetCurrencyButton" class="secondary-button compact-button" type="button" aria-pressed="false">RM format</button>
-            <button id="sheetMergeButton" class="secondary-button compact-button" type="button" aria-pressed="false">Merge cells</button>
-            <button id="sheetHeaderButton" class="secondary-button compact-button" type="button">Header row</button>
-            <button id="sheetExportButton" class="secondary-button compact-button" type="button">Export CSV</button>
-            <button id="sheetClearButton" class="danger-button compact-button" type="button">Clear</button>
-          </div>
-
-          <div id="sheetSizeControls" class="sheet-size-controls" hidden>
-            <div class="sheet-size-heading">
-              <div>
-                <span>Selected cell</span>
-                <strong id="sheetSizeCellLabel">A1</strong>
-              </div>
-              <button id="sheetCloseSizeButton" class="secondary-button compact-button" type="button">Done</button>
-            </div>
-
-            <label class="sheet-size-field">
-              <span>Column <strong id="sheetColumnLabel">A</strong> width</span>
-              <div class="sheet-range-row">
-                <input id="sheetColumnWidth" type="range" min="72" max="320" step="4" value="112">
-                <output id="sheetColumnWidthValue" for="sheetColumnWidth">112 px</output>
-              </div>
-            </label>
-
-            <label class="sheet-size-field">
-              <span>Row <strong id="sheetRowLabel">1</strong> height</span>
-              <div class="sheet-range-row">
-                <input id="sheetRowHeight" type="range" min="44" max="180" step="4" value="56">
-                <output id="sheetRowHeightValue" for="sheetRowHeight">56 px</output>
-              </div>
-            </label>
-
-            <div class="sheet-size-actions">
-              <button id="sheetApplyWidthAllButton" class="secondary-button compact-button" type="button">Width to all</button>
-              <button id="sheetApplyHeightAllButton" class="secondary-button compact-button" type="button">Height to all</button>
-              <button id="sheetResetSelectedSizeButton" class="secondary-button compact-button" type="button">Reset selected</button>
-              <button id="sheetResetAllSizesButton" class="secondary-button compact-button" type="button">Reset all sizes</button>
-            </div>
-          </div>
-
           <section class="sheet-value-link" aria-label="Link a dashboard value to the sheet">
             <div class="sheet-value-link-heading">
               <div>
@@ -336,6 +285,60 @@
             To merge, select the first cell, tap <strong>Merge cells</strong>, then tap the opposite corner. Tap a merged cell and choose <strong>Unmerge</strong> to separate it.
             Use <strong>Cell size</strong> on iPhone, or drag the edge of a column or row heading on a computer.
           </p>
+
+
+          <div class="sheet-actions-area">
+            <div class="panel-heading sheet-title-row">
+              <div>
+                <p class="section-kicker">TABLE</p>
+                <h2 id="customSheetTitle">Quick table</h2>
+              </div>
+            </div>
+
+            <div class="sheet-toolbar" aria-label="Spreadsheet tools">
+              <button id="sheetAddRowButton" class="secondary-button compact-button" type="button">Add row</button>
+              <button id="sheetAddColumnButton" class="secondary-button compact-button" type="button">Add column</button>
+              <button id="sheetSizeButton" class="secondary-button compact-button" type="button" aria-expanded="false" aria-controls="sheetSizeControls">Cell size</button>
+              <button id="sheetCurrencyButton" class="secondary-button compact-button" type="button" aria-pressed="false">RM format</button>
+              <button id="sheetMergeButton" class="secondary-button compact-button" type="button" aria-pressed="false">Merge cells</button>
+              <button id="sheetHeaderButton" class="secondary-button compact-button" type="button">Header row</button>
+              <button id="sheetExportButton" class="secondary-button compact-button" type="button">Export CSV</button>
+              <button id="sheetClearButton" class="danger-button compact-button" type="button">Clear</button>
+            </div>
+
+            <div id="sheetSizeControls" class="sheet-size-controls" hidden>
+              <div class="sheet-size-heading">
+                <div>
+                  <span>Selected cell</span>
+                  <strong id="sheetSizeCellLabel">A1</strong>
+                </div>
+                <button id="sheetCloseSizeButton" class="secondary-button compact-button" type="button">Done</button>
+              </div>
+
+              <label class="sheet-size-field">
+                <span>Column <strong id="sheetColumnLabel">A</strong> width</span>
+                <div class="sheet-range-row">
+                  <input id="sheetColumnWidth" type="range" min="72" max="320" step="4" value="112">
+                  <output id="sheetColumnWidthValue" for="sheetColumnWidth">112 px</output>
+                </div>
+              </label>
+
+              <label class="sheet-size-field">
+                <span>Row <strong id="sheetRowLabel">1</strong> height</span>
+                <div class="sheet-range-row">
+                  <input id="sheetRowHeight" type="range" min="44" max="180" step="4" value="56">
+                  <output id="sheetRowHeightValue" for="sheetRowHeight">56 px</output>
+                </div>
+              </label>
+
+              <div class="sheet-size-actions">
+                <button id="sheetApplyWidthAllButton" class="secondary-button compact-button" type="button">Width to all</button>
+                <button id="sheetApplyHeightAllButton" class="secondary-button compact-button" type="button">Height to all</button>
+                <button id="sheetResetSelectedSizeButton" class="secondary-button compact-button" type="button">Reset selected</button>
+                <button id="sheetResetAllSizesButton" class="secondary-button compact-button" type="button">Reset all sizes</button>
+              </div>
+            </div>
+          </div>
 
           <div class="sheet-scroll" aria-label="Editable spreadsheet">
             <table id="customSheetTable" class="custom-sheet-table"></table>
