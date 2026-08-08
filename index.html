@@ -24,14 +24,14 @@
     })();
   </script>
 
-  <link rel="manifest" href="manifest.webmanifest?v=20">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=20">
-  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=20">
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="manifest" href="manifest.webmanifest?v=23">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=23">
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg?v=23">
+  <link rel="stylesheet" href="styles.css?v=23">
 
-  <script src="cycle.js?v=20" defer></script>
-  <script src="db.js?v=20" defer></script>
-  <script src="app.js?v=20" defer></script>
+  <script src="cycle.js?v=23" defer></script>
+  <script src="db.js?v=23" defer></script>
+  <script src="app.js?v=23" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -238,6 +238,12 @@
         </div>
 
         <section class="panel sheet-panel">
+          <div class="sheet-info-launch">
+            <button id="sheetInfoButton" class="secondary-button sheet-info-button" type="button" aria-haspopup="dialog" aria-controls="spreadsheetInfoDialog">
+              Spreadsheet Information
+            </button>
+          </div>
+
           <section class="sheet-value-link" aria-label="Link a dashboard value to the sheet">
             <div class="sheet-value-link-heading">
               <div>
@@ -278,15 +284,6 @@
             <input id="formulaInput" type="text" placeholder="Select a cell or type formula, e.g. =SUM(B2:B10)">
           </div>
 
-          <p class="form-help sheet-help">
-            Formula examples: <strong>=SUM(B2:B10)</strong>, <strong>=AVG(C2:C8)</strong>, <strong>=A2+B2</strong>.<br>
-            Select a cell and tap <strong>RM format</strong> to display an entered number as <strong>RM 300.00</strong>. The stored number remains available for calculations.<br>
-            Dashboard formulas: <strong>=TOTALINCOME()</strong>, <strong>=EXPENSES()</strong>, <strong>=SAVED()</strong>, <strong>=AVAILABLE()</strong>.
-            To merge, select the first cell, tap <strong>Merge cells</strong>, then tap the opposite corner. Tap a merged cell and choose <strong>Unmerge</strong> to separate it.
-            Use <strong>Cell size</strong> on iPhone, or drag the edge of a column or row heading on a computer.
-          </p>
-
-
           <div class="sheet-actions-area">
             <div class="panel-heading sheet-title-row">
               <div>
@@ -318,7 +315,7 @@
               <label class="sheet-size-field">
                 <span>Column <strong id="sheetColumnLabel">A</strong> width</span>
                 <div class="sheet-range-row">
-                  <input id="sheetColumnWidth" type="range" min="72" max="320" step="4" value="112">
+                  <input id="sheetColumnWidth" type="range" min="48" max="320" step="2" value="112">
                   <output id="sheetColumnWidthValue" for="sheetColumnWidth">112 px</output>
                 </div>
               </label>
@@ -326,7 +323,7 @@
               <label class="sheet-size-field">
                 <span>Row <strong id="sheetRowLabel">1</strong> height</span>
                 <div class="sheet-range-row">
-                  <input id="sheetRowHeight" type="range" min="44" max="180" step="4" value="56">
+                  <input id="sheetRowHeight" type="range" min="32" max="180" step="2" value="56">
                   <output id="sheetRowHeightValue" for="sheetRowHeight">56 px</output>
                 </div>
               </label>
@@ -344,6 +341,77 @@
             <table id="customSheetTable" class="custom-sheet-table"></table>
           </div>
         </section>
+
+        <dialog id="spreadsheetInfoDialog" class="spreadsheet-info-dialog" aria-labelledby="spreadsheetInfoTitle">
+          <div class="spreadsheet-info-card">
+            <div class="spreadsheet-info-heading">
+              <div>
+                <p class="section-kicker">HELP</p>
+                <h2 id="spreadsheetInfoTitle">Spreadsheet Information</h2>
+              </div>
+              <button id="sheetInfoCloseButton" class="dialog-close-button" type="button" aria-label="Close spreadsheet information">&times;</button>
+            </div>
+
+            <div class="spreadsheet-info-content">
+              <section class="info-section">
+                <h3>Current sheet limits</h3>
+                <div class="info-limit-grid">
+                  <div><span>Maximum rows</span><strong id="sheetInfoMaxRows">120</strong></div>
+                  <div><span>Maximum columns</span><strong><span id="sheetInfoMaxColumns">52</span> (A-<span id="sheetInfoLastColumn">AZ</span>)</strong></div>
+                </div>
+                <p>The sheet starts with 20 rows. Use <strong>Add row</strong> and <strong>Add column</strong> to expand it until these limits.</p>
+              </section>
+
+              <section class="info-section">
+                <h3>Basic calculations</h3>
+                <div class="formula-reference">
+                  <code>=A1+B1</code><span>Addition</span>
+                  <code>=A1-B1</code><span>Subtraction</span>
+                  <code>=A1*B1</code><span>Multiplication</span>
+                  <code>=A1/B1</code><span>Division</span>
+                  <code>=(A1+B1)*2</code><span>Combined calculation using brackets</span>
+                </div>
+              </section>
+
+              <section class="info-section">
+                <h3>Functions</h3>
+                <div class="formula-reference">
+                  <code>=SUM(B2:B10)</code><span>Add all numeric values</span>
+                  <code>=AVG(C2:C8)</code><span>Average numeric values</span>
+                  <code>=MIN(B2:B10)</code><span>Smallest value</span>
+                  <code>=MAX(B2:B10)</code><span>Largest value</span>
+                  <code>=COUNT(A2:A20)</code><span>Count numeric cells</span>
+                  <code>=SUM(A1:A5,C1:C5)</code><span>Use more than one range</span>
+                </div>
+              </section>
+
+              <section class="info-section">
+                <h3>Home dashboard formulas</h3>
+                <div class="formula-reference">
+                  <code>=TOTALINCOME()</code><span>Total income for the selected salary cycle</span>
+                  <code>=EXPENSES()</code><span>Total expenses</span>
+                  <code>=SAVED()</code><span>Total saved</span>
+                  <code>=AVAILABLE()</code><span>Available balance</span>
+                </div>
+              </section>
+
+              <section class="info-section">
+                <h3>Formatting and table tools</h3>
+                <ul class="spreadsheet-info-list">
+                  <li><strong>RM format:</strong> select a numeric cell and tap RM format to display values such as <strong>RM 300.00</strong>. The number remains usable in calculations.</li>
+                  <li><strong>Merged cells:</strong> select the first cell, tap Merge cells, then tap the opposite corner. Select a merged cell and tap Unmerge to separate it.</li>
+                  <li><strong>Cell size:</strong> use Cell size on iPhone. On a computer, you can also drag a column or row edge.</li>
+                  <li><strong>Formula editing:</strong> select a calculated cell to view or change its original formula in the formula bar.</li>
+                  <li><strong>Dashboard links:</strong> linked Home values update automatically when the selected budget data changes.</li>
+                </ul>
+              </section>
+            </div>
+
+            <div class="spreadsheet-info-footer">
+              <button id="sheetInfoDoneButton" class="primary-button" type="button">Done</button>
+            </div>
+          </div>
+        </dialog>
       </section>
 
       <section id="settingsView" class="view" aria-label="Settings">

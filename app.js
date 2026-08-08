@@ -19,12 +19,15 @@ const state = {
   toastTimer: null
 };
 
+const SHEET_MAX_ROWS = 120;
+const SHEET_MAX_COLUMNS = 52; // A through AZ
+
 const SHEET_SIZE_LIMITS = {
-  minColumn: 72,
+  minColumn: 48,
   maxColumn: 320,
   mobileColumn: 112,
   desktopColumn: 126,
-  minRow: 44,
+  minRow: 32,
   maxRow: 180,
   defaultRow: 56
 };
@@ -134,6 +137,14 @@ function bindEvents() {
   document.getElementById("sheetUnlinkValueButton").addEventListener("click", unlinkDashboardValueFromSheet);
   document.getElementById("sheetLinkCell").addEventListener("input", normaliseSheetLinkCellInput);
   document.getElementById("formulaInput").addEventListener("input", updateActiveCellFromFormulaBar);
+  document.getElementById("sheetInfoButton").addEventListener("click", openSpreadsheetInfo);
+  document.getElementById("sheetInfoCloseButton").addEventListener("click", closeSpreadsheetInfo);
+  document.getElementById("sheetInfoDoneButton").addEventListener("click", closeSpreadsheetInfo);
+
+  const infoDialog = document.getElementById("spreadsheetInfoDialog");
+  infoDialog.addEventListener("click", (event) => {
+    if (event.target === infoDialog) closeSpreadsheetInfo();
+  });
 
   const sheetTable = document.getElementById("customSheetTable");
   sheetTable.addEventListener("focusin", handleSheetCellFocus);
@@ -146,6 +157,31 @@ function bindEvents() {
     renderDashboard();
     if (state.currentView === "sheet") renderCustomSheet();
   }, 150));
+}
+
+function openSpreadsheetInfo() {
+  const dialog = document.getElementById("spreadsheetInfoDialog");
+  if (!dialog) return;
+
+  document.getElementById("sheetInfoMaxRows").textContent = String(SHEET_MAX_ROWS);
+  document.getElementById("sheetInfoMaxColumns").textContent = String(SHEET_MAX_COLUMNS);
+  document.getElementById("sheetInfoLastColumn").textContent = columnIndexToName(SHEET_MAX_COLUMNS);
+
+  if (typeof dialog.showModal === "function") {
+    if (!dialog.open) dialog.showModal();
+  } else {
+    dialog.setAttribute("open", "");
+  }
+}
+
+function closeSpreadsheetInfo() {
+  const dialog = document.getElementById("spreadsheetInfoDialog");
+  if (!dialog) return;
+  if (typeof dialog.close === "function" && dialog.open) {
+    dialog.close();
+  } else {
+    dialog.removeAttribute("open");
+  }
 }
 
 function initializeTheme() {
@@ -1016,8 +1052,8 @@ function normaliseSheetFormats(sourceFormats, rows, cols) {
 
 function normaliseCustomSheet(sheet) {
   const source = sheet || {};
-  const rows = Math.min(Math.max(Number(source.rows || 20), 1), 120);
-  const cols = Math.min(Math.max(Number(source.cols || 6), 1), 18);
+  const rows = Math.min(Math.max(Number(source.rows || 20), 1), SHEET_MAX_ROWS);
+  const cols = Math.min(Math.max(Number(source.cols || 6), 1), SHEET_MAX_COLUMNS);
   const columnWidths = {};
   const rowHeights = {};
 
@@ -1895,18 +1931,42 @@ async function saveCustomSheetNow() {
 
 async function addCustomSheetRow() {
   if (!state.customSheet) return;
-  state.customSheet.rows = Math.min(Number(state.customSheet.rows || 20) + 1, 120);
+  const currentRows = Number(state.customSheet.rows || 20);
+  if (currentRows >= SHEET_MAX_ROWS) {
+    showToast(`Maximum ${SHEET_MAX_ROWS} rows reached.`);
+    return;
+  }
+
+  state.customSheet.rows = currentRows + 1;
   await saveCustomSheetNow();
   renderCustomSheet();
-  showToast("Row added.");
+  showToast(`Row ${state.customSheet.rows} added.`);
 }
 
 async function addCustomSheetColumn() {
   if (!state.customSheet) return;
-  state.customSheet.cols = Math.min(Number(state.customSheet.cols || 6) + 1, 18);
+
+  const currentColumns = Number(state.customSheet.cols || 6);
+  if (currentColumns >= SHEET_MAX_COLUMNS) {
+    showToast(`Maximum ${SHEET_MAX_COLUMNS} columns reached (A-${columnIndexToName(SHEET_MAX_COLUMNS)}).`);
+    return;
+  }
+
+  state.customSheet.cols = currentColumns + 1;
+  const newColumnName = columnIndexToName(state.customSheet.cols);
   await saveCustomSheetNow();
   renderCustomSheet();
-  showToast("Column added.");
+
+  // After adding a column, reveal it automatically on narrow/mobile screens.
+  requestAnimationFrame(() => {
+    const table = document.getElementById("customSheetTable");
+    const scrollContainer = table?.closest(".sheet-scroll");
+    if (scrollContainer) {
+      scrollContainer.scrollLeft = scrollContainer.scrollWidth;
+    }
+  });
+
+  showToast(`Column ${newColumnName} added.`);
 }
 
 async function toggleCustomSheetHeader() {
